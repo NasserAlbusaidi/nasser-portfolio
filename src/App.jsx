@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { History, Hammer, Trash2, Lock, Unlock, Save, KeyRound, Upload, Loader2, Activity, Waves, Bike, Footprints, Flag, MapPin, ChevronDown } from 'lucide-react';
+import { History, Hammer, Trash2, Lock, Unlock, Save, KeyRound, Upload, Loader2, Activity, Waves, Bike, Footprints, Flag, MapPin, ChevronDown, Plus, X, Flame } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, onSnapshot, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { getAnalytics, logEvent } from "firebase/analytics"; // <--- IMPORTED ANALYTICS
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -19,6 +20,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// --- ANALYTICS INIT (With Safety Check) ---
+let analytics = null;
+try {
+  // Only init if we are in the browser
+  if (typeof window !== 'undefined') {
+    analytics = getAnalytics(app);
+  }
+} catch (error) {
+  console.warn("Analytics failed to initialize (Check if enabled in Firebase Console):", error);
+}
 
 // --- CONSTANTS ---
 const CATEGORIES = ["All", "Landscape", "Portrait", "Street", "Workout", "Events", "Misc"];
@@ -45,7 +57,7 @@ export default function App() {
 
   // Upload Form State
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadType, setUploadType] = useState("training"); // 'portfolio' or 'training'
+  const [uploadType, setUploadType] = useState("training"); 
   const [imageFile, setImageFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [newItem, setNewItem] = useState({
@@ -61,12 +73,18 @@ export default function App() {
     duration: ''
   });
 
-  // --- 1. AUTHENTICATION ---
+  // --- 1. AUTHENTICATION & ANALYTICS ---
   useEffect(() => {
     const initAuth = async () => {
       try { await signInAnonymously(auth); } catch (e) { console.error(e); }
     };
     initAuth();
+    
+    // Log a page view when the app mounts
+    if (analytics) {
+      logEvent(analytics, 'page_view');
+    }
+
     const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
   }, []);
@@ -131,7 +149,36 @@ export default function App() {
     return days > 0 ? days : 0;
   };
 
-  // --- 4. HANDLERS ---
+  // --- 4. HEATMAP LOGIC ---
+  const getHeatmapData = () => {
+    const today = new Date();
+    const days = [];
+    const getScore = (log) => {
+      const dist = parseFloat(log.distance) || 0;
+      if (log.activityType === 'swim') return dist * 4;
+      if (log.activityType === 'run') return dist * 1;
+      if (log.activityType === 'bike') return dist * 0.33;
+      return 0;
+    };
+
+    for (let i = 364; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayLogs = trainingLogs.filter(log => log.date === dateStr);
+      const totalScore = dayLogs.reduce((acc, log) => acc + getScore(log), 0);
+      
+      days.push({
+        date: dateStr,
+        score: totalScore,
+        logs: dayLogs
+      });
+    }
+    return days;
+  };
+
+  // --- 5. HANDLERS ---
   const handleSecretTrigger = () => {
     if (isUnlocked) return;
     setClickCount(prev => {
@@ -157,13 +204,32 @@ export default function App() {
         imageUrl = await compressImage(imageFile);
       }
 
+      const rotations = ["rotate-0", "rotate-1", "-rotate-1", "rotate-2", "-rotate-2"];
+      const randomRotation = rotations[Math.floor(Math.random() * rotations.length)];
+
       const collectionName = uploadType === 'portfolio' ? 'garage_items' : 'ironman_logs';
       
       await addDoc(collection(db, collectionName), {
         ...newItem,
         url: imageUrl,
+        rotation: uploadType === 'portfolio' ? randomRotation : 'rotate-0',
         createdAt: serverTimestamp()
       });
+
+      // AUTOMATION: If Training + Photo, add to Garage
+      if (uploadType === 'training' && imageUrl) {
+         await addDoc(collection(db, 'garage_items'), {
+            filename: `TRAINING_${newItem.activityType.toUpperCase()}`,
+            date: newItem.date,
+            time: newItem.time, 
+            category: 'Workout', 
+            location: 'Ironman Training', 
+            description: `${newItem.activityType.toUpperCase()} // ${newItem.distance}km - ${newItem.description}`,
+            url: imageUrl, 
+            rotation: randomRotation,
+            createdAt: serverTimestamp()
+         });
+      }
 
       alert("Entry committed.");
       setNewItem(prev => ({ ...prev, filename: '', description: '', distance: 0 }));
@@ -184,13 +250,14 @@ export default function App() {
   };
 
   const totals = calculateTotals();
+  const heatmapData = getHeatmapData();
 
   // --- RENDER ---
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-neutral-400 font-mono selection:bg-orange-900 selection:text-white">
       
       {/* NAV */}
-      <nav className="fixed top-0 left-0 right-0 z-40 bg-[#0a0a0a]/90 border-b border-neutral-800 backdrop-blur-sm">
+      <nav className="fixed top-0 left-0 right-0 z-40 bg-[#0a0a0a]/95 border-b border-neutral-800 backdrop-blur-sm">
         <div className="max-w-screen-2xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3 cursor-pointer select-none" onClick={handleSecretTrigger}>
             <div className={`w-2 h-2 rounded-full ${isUnlocked ? 'bg-red-500' : 'bg-green-500'} animate-pulse`}></div>
@@ -199,9 +266,16 @@ export default function App() {
             </div>
           </div>
           
+          {/* Desktop Nav */}
           <div className="hidden md:flex gap-8 text-[10px] font-bold tracking-widest uppercase">
             <a href="#roadmap" className="hover:text-orange-500 transition-colors">Mission Roadmap</a>
             <a href="#garage" className="hover:text-orange-500 transition-colors">The Garage</a>
+          </div>
+
+          {/* Mobile Nav Trigger */}
+          <div className="md:hidden flex gap-4 text-[10px] font-bold tracking-widest uppercase">
+             <a href="#roadmap" className="text-orange-500">Mission</a>
+             <a href="#garage" className="text-neutral-500">Garage</a>
           </div>
         </div>
       </nav>
@@ -209,7 +283,7 @@ export default function App() {
       {/* PIN PAD */}
       {showPinPad && (
         <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4">
-          <div className="bg-neutral-900 border border-neutral-800 p-8 rounded-lg max-w-xs w-full text-center">
+          <div className="bg-neutral-900 border border-neutral-800 p-8 rounded-lg max-w-xs w-full text-center shadow-2xl">
             <KeyRound className="w-8 h-8 text-orange-600 mx-auto mb-4" />
             <p className="text-xs text-neutral-500 mb-4">SECURE PROTOCOL</p>
             <form onSubmit={handlePinSubmit}>
@@ -227,15 +301,16 @@ export default function App() {
 
       <div className="max-w-screen-2xl mx-auto">
         
-        {/* --- SECTION 1: MISSION CONTROL (The Roadmap) --- */}
-        <section id="roadmap" className="pt-32 px-6 pb-24 border-b border-neutral-800 min-h-screen">
+        {/* --- SECTION 1: MISSION CONTROL --- */}
+        <section id="roadmap" className="pt-32 px-4 md:px-6 pb-24 border-b border-neutral-800 min-h-screen">
+          
           {/* Header & Countdown */}
-          <div className="flex flex-col lg:flex-row items-end justify-between gap-8 mb-16">
+          <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-8 mb-16">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-orange-900/20 text-orange-500 text-xs font-bold mb-4">
                 <Activity className="w-3 h-3" /> ACTIVE MISSION
               </div>
-              <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 tracking-tighter">
+              <h1 className="text-4xl md:text-7xl font-bold text-white mb-4 tracking-tighter">
                 Road to Ironman.
               </h1>
               <p className="text-sm text-neutral-500 max-w-lg leading-relaxed">
@@ -244,16 +319,14 @@ export default function App() {
               </p>
             </div>
             
-            {/* The Big Countdown */}
-            <div className="bg-neutral-900/50 border border-neutral-800 p-6 rounded-xl text-center min-w-[200px]">
-              <div className="text-5xl font-bold text-white font-sans mb-1">{getTimeUntilRace()}</div>
+            <div className="w-full lg:w-auto bg-neutral-900/50 border border-neutral-800 p-6 rounded-xl text-center">
+              <div className="text-4xl md:text-5xl font-bold text-white font-sans mb-1">{getTimeUntilRace()}</div>
               <div className="text-[10px] text-neutral-500 uppercase tracking-widest">Days Until Race</div>
             </div>
           </div>
 
-          {/* Dashboard Gauges */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-24">
-              {/* SWIM */}
+          {/* Gauges */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
               <div className="bg-neutral-900/30 border border-neutral-800 p-5 rounded-lg relative overflow-hidden group hover:border-blue-900/50 transition-colors">
                 <div className="absolute top-0 left-0 h-0.5 bg-blue-500 transition-all duration-1000" style={{ width: `${Math.min((totals.swim / TARGETS.swim) * 100, 100)}%` }}></div>
                 <div className="flex justify-between items-start mb-4">
@@ -263,7 +336,6 @@ export default function App() {
                 <div className="text-2xl font-bold text-white">{totals.swim.toFixed(1)} <span className="text-sm text-neutral-600 font-normal">/ {TARGETS.swim} km</span></div>
               </div>
 
-              {/* BIKE */}
               <div className="bg-neutral-900/30 border border-neutral-800 p-5 rounded-lg relative overflow-hidden group hover:border-orange-900/50 transition-colors">
                 <div className="absolute top-0 left-0 h-0.5 bg-orange-500 transition-all duration-1000" style={{ width: `${Math.min((totals.bike / TARGETS.bike) * 100, 100)}%` }}></div>
                 <div className="flex justify-between items-start mb-4">
@@ -273,7 +345,6 @@ export default function App() {
                 <div className="text-2xl font-bold text-white">{totals.bike.toFixed(1)} <span className="text-sm text-neutral-600 font-normal">/ {TARGETS.bike} km</span></div>
               </div>
 
-              {/* RUN */}
               <div className="bg-neutral-900/30 border border-neutral-800 p-5 rounded-lg relative overflow-hidden group hover:border-green-900/50 transition-colors">
                 <div className="absolute top-0 left-0 h-0.5 bg-green-500 transition-all duration-1000" style={{ width: `${Math.min((totals.run / TARGETS.run) * 100, 100)}%` }}></div>
                 <div className="flex justify-between items-start mb-4">
@@ -284,84 +355,91 @@ export default function App() {
               </div>
           </div>
 
-          {/* --- THE ROADMAP TIMELINE --- */}
-          <div className="relative max-w-3xl mx-auto">
-            
-            {/* Center Line */}
-            <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-px bg-neutral-800 transform md:-translate-x-1/2"></div>
+          {/* Heatmap */}
+          <div className="mb-24 bg-neutral-900/20 border border-neutral-800/50 p-6 rounded-xl overflow-x-auto">
+             <div className="flex items-center gap-3 mb-4 text-neutral-500 text-xs font-bold uppercase tracking-widest">
+                <Flame className="w-4 h-4 text-orange-500" /> Consistency Graph
+             </div>
+             <div className="flex gap-[2px] min-w-max">
+                {Array.from({ length: 53 }).map((_, colIndex) => (
+                   <div key={colIndex} className={`flex-col gap-[2px] ${colIndex < 30 ? 'hidden md:flex' : 'flex'}`}>
+                      {Array.from({ length: 7 }).map((_, rowIndex) => {
+                         const dayIndex = colIndex * 7 + rowIndex;
+                         const dayData = heatmapData[dayIndex];
+                         if (!dayData) return null;
+                         let bgClass = 'bg-neutral-900';
+                         if (dayData.score > 0) bgClass = 'bg-orange-900/40';
+                         if (dayData.score > 5) bgClass = 'bg-orange-700/60';
+                         if (dayData.score > 10) bgClass = 'bg-orange-600';
+                         if (dayData.score > 20) bgClass = 'bg-orange-500';
+                         return (
+                            <div key={dayData.date} className={`w-3 h-3 rounded-sm ${bgClass} transition-colors duration-300 hover:ring-1 ring-white relative group`}>
+                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-20 whitespace-nowrap bg-black border border-neutral-700 text-[10px] text-white px-2 py-1 rounded shadow-xl">
+                                  <div className="font-bold text-neutral-400">{dayData.date}</div>
+                                  {dayData.logs.length > 0 ? dayData.logs.map((l, i) => <div key={i} className="text-orange-500">{l.activityType.toUpperCase()} {l.distance}km</div>) : <span>Rest Day</span>}
+                               </div>
+                            </div>
+                         );
+                      })}
+                   </div>
+                ))}
+             </div>
+             <div className="flex items-center gap-2 mt-4 text-[10px] text-neutral-600 justify-end">
+                <span>Less</span>
+                <div className="w-3 h-3 rounded-sm bg-neutral-900"></div>
+                <div className="w-3 h-3 rounded-sm bg-orange-900/40"></div>
+                <div className="w-3 h-3 rounded-sm bg-orange-600"></div>
+                <div className="w-3 h-3 rounded-sm bg-orange-500"></div>
+                <span>More</span>
+             </div>
+          </div>
 
-            {/* Finish Line Marker (Top) */}
-            <div className="relative flex items-center mb-12 md:justify-center">
+          {/* Roadmap Timeline */}
+          <div className="relative max-w-3xl mx-auto px-2 md:px-0">
+            <div className="absolute left-6 md:left-1/2 top-0 bottom-0 w-px bg-neutral-800 transform md:-translate-x-1/2"></div>
+            <div className="relative flex items-center mb-12 justify-start md:justify-center pl-2 md:pl-0">
                <div className="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center z-10 shadow-[0_0_20px_rgba(234,88,12,0.5)]">
                  <Flag className="w-4 h-4 text-white" />
                </div>
                <div className="ml-4 text-orange-500 font-bold tracking-widest text-xs">IRONMAN GOAL</div>
             </div>
-
-            {/* Logs */}
             {trainingLogs.map((log, index) => {
               const isLeft = index % 2 === 0;
-              // Icons based on activity
               const Icon = log.activityType === 'swim' ? Waves : log.activityType === 'bike' ? Bike : Footprints;
               const colorClass = log.activityType === 'swim' ? 'text-blue-500' : log.activityType === 'bike' ? 'text-orange-500' : 'text-green-500';
-
               return (
                 <div key={log.id} className={`relative flex flex-col md:flex-row items-center mb-16 ${isLeft ? 'md:flex-row-reverse' : ''}`}>
-                  
-                  {/* Timeline Node */}
-                  <div className="absolute left-4 md:left-1/2 w-3 h-3 bg-[#0a0a0a] border-2 border-neutral-600 rounded-full z-10 transform -translate-x-[5px] md:-translate-x-1.5 mt-6 md:mt-0"></div>
-
-                  {/* Spacer for Desktop Alignment */}
+                  <div className="absolute left-6 md:left-1/2 w-3 h-3 bg-[#0a0a0a] border-2 border-neutral-600 rounded-full z-10 transform -translate-x-[5px] md:-translate-x-1.5 mt-6 md:mt-0"></div>
                   <div className="hidden md:block w-1/2"></div>
-
-                  {/* Content Card */}
-                  <div className={`w-full md:w-[45%] pl-12 md:pl-0 ${isLeft ? 'md:pr-12 text-left md:text-right' : 'md:pl-12 text-left'}`}>
-                    
+                  <div className={`w-full md:w-[45%] pl-16 md:pl-0 ${isLeft ? 'md:pr-12 text-left md:text-right' : 'md:pl-12 text-left'}`}>
                     <div className={`inline-flex items-center gap-2 mb-2 text-[10px] font-bold uppercase tracking-widest ${colorClass} ${isLeft ? 'md:flex-row-reverse' : ''}`}>
                        <Icon className="w-4 h-4" />
                        <span>{log.activityType} // {log.distance}KM</span>
                     </div>
-
                     <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 hover:border-neutral-700 transition-colors group relative">
                        {isUnlocked && (
-                         <button onClick={(e) => {e.stopPropagation(); handleDelete(log.id, 'training')}} 
-                           className="absolute top-2 right-2 text-neutral-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <Trash2 className="w-3 h-3" />
-                         </button>
+                         <button onClick={(e) => {e.stopPropagation(); handleDelete(log.id, 'training')}} className="absolute top-2 right-2 text-neutral-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3" /></button>
                        )}
-                       
                        {log.url && (
                          <div className="mb-3 rounded overflow-hidden aspect-video">
                            <img src={log.url} className="w-full h-full object-cover opacity-90" alt="Log" />
                          </div>
                        )}
-                       
                        <p className="text-neutral-300 text-sm leading-relaxed mb-3">"{log.description}"</p>
-                       
                        <div className={`text-[10px] text-neutral-600 uppercase tracking-wider flex gap-4 ${isLeft ? 'md:justify-end' : ''}`}>
                          <span>{log.date}</span>
                          {log.duration && <span>{log.duration} MIN</span>}
                        </div>
                     </div>
                   </div>
-
                 </div>
               );
             })}
-
-            {trainingLogs.length === 0 && (
-              <div className="text-center py-12 text-neutral-600 text-xs">
-                NO LOGS RECORDED YET. JOURNEY BEGINS NOW.
-              </div>
-            )}
-
-            {/* Start Line (Bottom) */}
-            <div className="relative flex items-center mt-12 md:justify-center">
+            <div className="relative flex items-center mt-12 justify-start md:justify-center pl-5 md:pl-0">
                <div className="w-4 h-4 rounded-full bg-neutral-800 z-10"></div>
             </div>
           </div>
-
-          {/* Scroll Indicator */}
+          
           <div className="flex justify-center mt-20">
              <a href="#garage" className="animate-bounce p-2 bg-neutral-900 rounded-full text-neutral-500 hover:text-white transition-colors">
                <ChevronDown className="w-6 h-6" />
@@ -369,11 +447,10 @@ export default function App() {
           </div>
         </section>
 
-
         {/* --- SECTION 2: THE GARAGE (Portfolio) --- */}
         <section id="garage" className="py-24 px-6 min-h-screen bg-[#0f0f0f]">
-            {/* Header */}
-            <div className="flex flex-col lg:flex-row items-end justify-between gap-8 mb-12">
+            {/* Header - FIXED ALIGNMENT */}
+            <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-8 mb-12">
                <div>
                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-neutral-800 text-yellow-500 text-xs font-bold mb-6">
                    <Hammer className="w-3 h-3" /> NASSER'S GARAGE
@@ -415,30 +492,25 @@ export default function App() {
 
       </div>
 
-      {/* --- ADMIN UPLOAD MODAL (Floating) --- */}
+      {/* --- ADMIN UPLOAD MODAL --- */}
       {isUnlocked && (
         <div className="fixed bottom-6 right-6 z-30">
-           <button 
-             onClick={() => setShowUploadModal(!showUploadModal)}
-             className="bg-red-600 hover:bg-red-500 text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110"
-           >
+           <button onClick={() => setShowUploadModal(!showUploadModal)} className="bg-red-600 hover:bg-red-500 text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110">
              {showUploadModal ? <X className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
            </button>
-
-           {/* Modal Content */}
            {showUploadModal && (
-             <div className="absolute bottom-20 right-0 w-[90vw] md:w-[400px] bg-neutral-900 border border-neutral-700 p-6 rounded-lg shadow-2xl animate-in slide-in-from-bottom-10">
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Upload className="w-4 h-4" /> UPLOAD CENTER</h3>
-                
+             <div className="fixed bottom-0 left-0 right-0 w-full md:absolute md:bottom-20 md:right-0 md:left-auto md:w-[400px] bg-neutral-900 border-t md:border border-neutral-700 p-6 rounded-t-2xl md:rounded-lg shadow-2xl animate-in slide-in-from-bottom-10 max-h-[80vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-4">
+                   <h3 className="text-white font-bold flex items-center gap-2"><Upload className="w-4 h-4" /> UPLOAD CENTER</h3>
+                   <button onClick={() => setShowUploadModal(false)} className="md:hidden text-neutral-500 hover:text-white"><X className="w-5 h-5" /></button>
+                </div>
                 <div className="flex gap-2 mb-4 p-1 bg-black rounded">
                    <button onClick={() => setUploadType('portfolio')} className={`flex-1 py-2 text-[10px] font-bold uppercase rounded ${uploadType === 'portfolio' ? 'bg-neutral-800 text-white' : 'text-neutral-500'}`}>Portfolio</button>
                    <button onClick={() => setUploadType('training')} className={`flex-1 py-2 text-[10px] font-bold uppercase rounded ${uploadType === 'training' ? 'bg-neutral-800 text-white' : 'text-neutral-500'}`}>Training</button>
                 </div>
-
                 <form onSubmit={handleUpload} className="space-y-3">
                    <input type="date" required className="w-full bg-black border border-neutral-800 p-3 text-xs text-white outline-none focus:border-neutral-500" 
                       value={newItem.date} onChange={e => setNewItem({...newItem, date: e.target.value})} />
-
                    {uploadType === 'portfolio' ? (
                      <>
                        <input placeholder="Filename" className="w-full bg-black border border-neutral-800 p-3 text-xs text-white outline-none focus:border-neutral-500" 
@@ -462,7 +534,6 @@ export default function App() {
                           value={newItem.duration} onChange={e => setNewItem({...newItem, duration: e.target.value})} />
                      </>
                    )}
-
                    <div className="relative group">
                       <input type="file" accept="image/*" className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-20"
                         onChange={(e) => {
@@ -476,10 +547,8 @@ export default function App() {
                         <Upload className="w-3 h-3" /> {imageFile ? imageFile.name : "Select Image (Max 800px)..."}
                       </div>
                    </div>
-
                    <textarea placeholder="Notes..." rows="3" className="w-full bg-black border border-neutral-800 p-3 text-xs text-white outline-none focus:border-neutral-500"
                       value={newItem.description} onChange={e => setNewItem({...newItem, description: e.target.value})} />
-
                    <button disabled={isUploading} className="w-full bg-white hover:bg-neutral-200 text-black font-bold text-xs py-3 tracking-widest flex items-center justify-center gap-2">
                       {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                       {isUploading ? "SAVING..." : "COMMIT"}
