@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { History, Hammer, Trash2, Lock, Unlock, Save, KeyRound, Upload, Loader2, Activity, Waves, Bike, Footprints, Flag, MapPin, ChevronDown, RefreshCw, X, Plus } from 'lucide-react';
+import { History, Hammer, Trash2, Lock, Unlock, Save, KeyRound, Upload, Loader2, Activity, Waves, Bike, Footprints, Flag, MapPin, ChevronDown, RefreshCw, X, Plus, Menu } from 'lucide-react';
 import BootSequence from './components/BootSequence';
 import { fetchActivities, processActivities } from './api/intervals';
 import { initializeApp } from 'firebase/app';
@@ -37,6 +37,7 @@ const INTERVALS_API_KEY = import.meta.env.VITE_INTERVALS_API_KEY;
 export default function App() {
   // Navigation State
   const [filter, setFilter] = useState("All");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Data State
   const [selectedImage, setSelectedImage] = useState(null);
@@ -274,11 +275,27 @@ export default function App() {
             </div>
           </div>
 
+          {/* Desktop Nav */}
           <div className="hidden md:flex gap-8 text-[10px] font-bold tracking-widest uppercase">
             <a href="#garage" className="hover:text-orange-500 transition-colors">The Garage</a>
             <a href="#roadmap" className="hover:text-orange-500 transition-colors">Mission Roadmap</a>
           </div>
+
+          {/* Mobile Nav Button */}
+          <div className="md:hidden">
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
+              {isMenuOpen ? <X className="w-6 h-6 text-white" /> : <Menu className="w-6 h-6 text-white" />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Menu */}
+        {isMenuOpen && (
+          <div className="md:hidden bg-[#0a0a0a] py-4">
+            <a href="#garage" className="block text-center text-sm uppercase py-2 hover:text-orange-500 transition-colors" onClick={() => setIsMenuOpen(false)}>The Garage</a>
+            <a href="#roadmap" className="block text-center text-sm uppercase py-2 hover:text-orange-500 transition-colors" onClick={() => setIsMenuOpen(false)}>Mission Roadmap</a>
+          </div>
+        )}
       </nav>
 
       {/* PIN PAD */}
@@ -310,7 +327,7 @@ export default function App() {
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-yellow-900/20 text-yellow-500 text-xs font-bold mb-6 border border-yellow-900/30">
                 <Hammer className="w-3 h-3" /> ARCHIVE_MANIFESTO_V1
               </div>
-              <h2 className="text-5xl md:text-8xl font-bold text-white mb-8 tracking-tighter">
+              <h2 className="text-6xl lg:text-8xl font-bold text-white mb-8 tracking-tighter">
                 VISUAL<br />MANIFESTO.
               </h2>
               <p className="text-sm md:text-base text-neutral-400 leading-relaxed max-w-xl font-mono border-l-2 border-yellow-500/50 pl-6">
@@ -323,7 +340,7 @@ export default function App() {
                 </span>
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 justify-end">
+            <div className="flex flex-wrap gap-2 justify-center md:justify-end">
               {CATEGORIES.map(cat => (
                 <button key={cat} onClick={() => setFilter(cat)}
                   className={`px-4 py-2 text-[10px] font-bold uppercase border transition-all tracking-widest ${filter === cat ? 'bg-yellow-500 text-black border-yellow-500' : 'border-neutral-800 text-neutral-500 hover:text-white hover:border-neutral-600'}`}>
@@ -374,12 +391,12 @@ export default function App() {
         {/* --- SECTION 2: MISSION CONTROL (The Roadmap) --- */}
         <section id="roadmap" className="py-24 px-6 border-t border-neutral-800 min-h-screen bg-[#0a0a0a]">
           {/* Header & Countdown */}
-          <div className="flex flex-col lg:flex-row items-end justify-between gap-8 mb-16">
-            <div>
+          <div className="flex flex-col lg:flex-row items-center lg:items-end justify-between gap-8 mb-16">
+            <div className="text-center lg:text-left">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-orange-900/20 text-orange-500 text-xs font-bold mb-4">
                 <Activity className="w-3 h-3" /> ACTIVE MISSION
               </div>
-              <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 tracking-tighter">
+              <h1 className="text-6xl lg:text-7xl font-bold text-white mb-4 tracking-tighter">
                 Road to Ironman.
               </h1>
               <p className="text-sm text-neutral-500 max-w-lg leading-relaxed">
@@ -389,8 +406,8 @@ export default function App() {
             </div>
 
             {/* The Big Countdown */}
-            <div className="bg-neutral-900/50 border border-neutral-800 p-6 rounded-xl text-center min-w-[200px]">
-              <div className="text-5xl font-bold text-white font-sans mb-1">{getTimeUntilRace()}</div>
+            <div className="bg-neutral-900/50 border border-neutral-800 p-4 md:p-6 rounded-xl text-center">
+              <div className="text-4xl md:text-5xl font-bold text-white font-sans mb-1">{getTimeUntilRace()}</div>
               <div className="text-[10px] text-neutral-500 uppercase tracking-widest">Days Until Race</div>
             </div>
           </div>
