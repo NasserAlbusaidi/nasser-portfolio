@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { History, Hammer, Trash2, Lock, Unlock, Save, KeyRound, Upload, Loader2, Activity, Waves, Bike, Footprints, Flag, MapPin, ChevronDown, RefreshCw, X, Plus } from 'lucide-react';
+import { History, Hammer, Trash2, Lock, Unlock, Save, KeyRound, Upload, Loader2, Activity, Waves, Bike, Footprints, Flag, MapPin, ChevronDown, RefreshCw, X, Plus, Menu } from 'lucide-react';
+import BootSequence from './components/BootSequence';
 import { fetchActivities, processActivities } from './api/intervals';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -36,12 +37,14 @@ const INTERVALS_API_KEY = import.meta.env.VITE_INTERVALS_API_KEY;
 export default function App() {
   // Navigation State
   const [filter, setFilter] = useState("All");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Data State
   const [selectedImage, setSelectedImage] = useState(null);
   const [portfolioItems, setPortfolioItems] = useState([]);
   const [trainingLogs, setTrainingLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isBooting, setIsBooting] = useState(true);
 
   // Auth & Admin State
   const [user, setUser] = useState(null);
@@ -260,6 +263,8 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-neutral-400 font-mono selection:bg-orange-900 selection:text-white">
 
+      {isBooting && <BootSequence onComplete={() => setIsBooting(false)} />}
+
       {/* NAV */}
       <nav className="fixed top-0 left-0 right-0 z-40 bg-[#0a0a0a]/90 border-b border-neutral-800 backdrop-blur-sm">
         <div className="max-w-screen-2xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -270,11 +275,27 @@ export default function App() {
             </div>
           </div>
 
+          {/* Desktop Nav */}
           <div className="hidden md:flex gap-8 text-[10px] font-bold tracking-widest uppercase">
             <a href="#garage" className="hover:text-orange-500 transition-colors">The Garage</a>
             <a href="#roadmap" className="hover:text-orange-500 transition-colors">Mission Roadmap</a>
           </div>
+
+          {/* Mobile Nav Button */}
+          <div className="md:hidden">
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
+              {isMenuOpen ? <X className="w-6 h-6 text-white" /> : <Menu className="w-6 h-6 text-white" />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Menu */}
+        {isMenuOpen && (
+          <div className="md:hidden bg-[#0a0a0a] py-4">
+            <a href="#garage" className="block text-center text-sm uppercase py-2 hover:text-orange-500 transition-colors" onClick={() => setIsMenuOpen(false)}>The Garage</a>
+            <a href="#roadmap" className="block text-center text-sm uppercase py-2 hover:text-orange-500 transition-colors" onClick={() => setIsMenuOpen(false)}>Mission Roadmap</a>
+          </div>
+        )}
       </nav>
 
       {/* PIN PAD */}
@@ -300,50 +321,69 @@ export default function App() {
 
         {/* --- SECTION 1: THE GARAGE (Portfolio) --- */}
         <section id="garage" className="pt-32 px-6 pb-24 min-h-screen bg-[#0f0f0f]">
-          {/* Header */}
-          <div className="flex flex-col lg:flex-row items-end justify-between gap-8 mb-12">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-neutral-800 text-yellow-500 text-xs font-bold mb-6">
-                <Hammer className="w-3 h-3" /> NASSER'S GARAGE
+          {/* Header - MANIFESTO STYLE */}
+          <div className="flex flex-col lg:flex-row items-end justify-between gap-12 mb-20 border-b border-neutral-800 pb-12">
+            <div className="max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-yellow-900/20 text-yellow-500 text-xs font-bold mb-6 border border-yellow-900/30">
+                <Hammer className="w-3 h-3" /> ARCHIVE_MANIFESTO_V1
               </div>
-              <h2 className="text-4xl font-bold text-white mb-4">The Archive.</h2>
-              <p className="text-sm text-neutral-500">
-                A collection of frozen moments. <br />
-                Raw, unpolished, real.
+              <h2 className="text-6xl lg:text-8xl font-bold text-white mb-8 tracking-tighter">
+                VISUAL<br />MANIFESTO.
+              </h2>
+              <p className="text-sm md:text-base text-neutral-400 leading-relaxed max-w-xl font-mono border-l-2 border-yellow-500/50 pl-6">
+                CAPTURING THE RAW, UNFILTERED REALITY OF THE GRIND.
+                NO FILTERS. NO STAGING. JUST THE MOMENT AS IT EXISTS.
+                <br /><br />
+                <span className="text-xs text-neutral-600 uppercase tracking-widest">
+                  // SYSTEM STATUS: ONLINE<br />
+                  // ASSET COUNT: {portfolioItems.length}
+                </span>
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 justify-center md:justify-end">
               {CATEGORIES.map(cat => (
                 <button key={cat} onClick={() => setFilter(cat)}
-                  className={`px-4 py-2 text-xs font-bold uppercase border transition-all ${filter === cat ? 'bg-white text-black border-white' : 'border-neutral-800 text-neutral-500 hover:text-white'}`}>
+                  className={`px-4 py-2 text-[10px] font-bold uppercase border transition-all tracking-widest ${filter === cat ? 'bg-yellow-500 text-black border-yellow-500' : 'border-neutral-800 text-neutral-500 hover:text-white hover:border-neutral-600'}`}>
                   {cat}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Grid - WIDER & DENSER */}
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {portfolioItems.filter(i => filter === 'All' || i.category === filter).map(item => (
-              <div key={item.id} onClick={() => setSelectedImage(item)} className={`group relative cursor-pointer bg-neutral-900 p-2 shadow-xl ${item.rotation || 'rotate-0'} hover:rotate-0 transition-all duration-500 hover:z-10`}>
+              <div key={item.id} onClick={() => setSelectedImage(item)}
+                className="group relative cursor-pointer bg-neutral-900 aspect-[4/5] overflow-hidden border border-neutral-800 hover:border-yellow-500/50 transition-colors">
+
+                {/* Image */}
+                <img src={item.url} alt={item.filename} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-all duration-500 grayscale group-hover:grayscale-0" />
+
+                {/* Scan Effect Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-yellow-500/10 to-transparent translate-y-[-100%] group-hover:translate-y-[100%] transition-transform duration-1000 pointer-events-none z-10"></div>
+
+                {/* Metadata Overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex justify-between items-end">
+                  <div>
+                    <div className="text-yellow-500 text-[10px] font-bold tracking-widest mb-1">IMG_{item.id.slice(0, 4).toUpperCase()}</div>
+                    <div className="text-white text-xs font-bold uppercase">{item.filename}</div>
+                  </div>
+                  <div className="text-neutral-500 text-[10px] font-mono">{item.date}</div>
+                </div>
+
+                {/* Admin Delete */}
                 {isUnlocked && (
-                  <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id, 'portfolio'); }} className="absolute -top-2 -right-2 z-20 bg-red-900 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id, 'portfolio'); }} className="absolute top-2 right-2 z-20 bg-red-900/80 text-white p-2 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"><Trash2 className="w-3 h-3" /></button>
                 )}
-                <div className="aspect-[4/5] overflow-hidden bg-black relative">
-                  <img src={item.url} alt={item.filename} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity grayscale hover:grayscale-0" />
-                </div>
-                <div className="mt-3 px-2 flex justify-between items-center text-[10px] uppercase tracking-wider text-neutral-500 group-hover:text-neutral-300">
-                  <span className="truncate max-w-[150px]">{item.filename}</span>
-                  <span>{item.date}</span>
-                </div>
               </div>
             ))}
           </div>
 
           {/* Scroll Indicator */}
-          <div className="flex justify-center mt-20">
-            <a href="#roadmap" className="animate-bounce p-2 bg-neutral-900 rounded-full text-neutral-500 hover:text-white transition-colors">
-              <ChevronDown className="w-6 h-6" />
+          <div className="flex justify-center mt-32">
+            <a href="#roadmap" className="group flex flex-col items-center gap-2 text-neutral-600 hover:text-yellow-500 transition-colors">
+              <span className="text-[10px] font-bold tracking-[0.2em] uppercase">Initiate Roadmap</span>
+              <ChevronDown className="w-4 h-4 animate-bounce" />
             </a>
           </div>
         </section>
@@ -351,12 +391,12 @@ export default function App() {
         {/* --- SECTION 2: MISSION CONTROL (The Roadmap) --- */}
         <section id="roadmap" className="py-24 px-6 border-t border-neutral-800 min-h-screen bg-[#0a0a0a]">
           {/* Header & Countdown */}
-          <div className="flex flex-col lg:flex-row items-end justify-between gap-8 mb-16">
-            <div>
+          <div className="flex flex-col lg:flex-row items-center lg:items-end justify-between gap-8 mb-16">
+            <div className="text-center lg:text-left">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-orange-900/20 text-orange-500 text-xs font-bold mb-4">
                 <Activity className="w-3 h-3" /> ACTIVE MISSION
               </div>
-              <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 tracking-tighter">
+              <h1 className="text-6xl lg:text-7xl font-bold text-white mb-4 tracking-tighter">
                 Road to Ironman.
               </h1>
               <p className="text-sm text-neutral-500 max-w-lg leading-relaxed">
@@ -366,8 +406,8 @@ export default function App() {
             </div>
 
             {/* The Big Countdown */}
-            <div className="bg-neutral-900/50 border border-neutral-800 p-6 rounded-xl text-center min-w-[200px]">
-              <div className="text-5xl font-bold text-white font-sans mb-1">{getTimeUntilRace()}</div>
+            <div className="bg-neutral-900/50 border border-neutral-800 p-4 md:p-6 rounded-xl text-center">
+              <div className="text-4xl md:text-5xl font-bold text-white font-sans mb-1">{getTimeUntilRace()}</div>
               <div className="text-[10px] text-neutral-500 uppercase tracking-widest">Days Until Race</div>
             </div>
           </div>
@@ -603,10 +643,78 @@ export default function App() {
         </div>
       )}
 
-      {/* Lightbox */}
+      {/* Blueprint Modal */}
       {selectedImage && (
-        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4" onClick={() => setSelectedImage(null)}>
-          <img src={selectedImage.url} className="max-h-[90vh] max-w-full shadow-2xl" alt="Full view" />
+        <div className="fixed inset-0 z-[60] bg-[#050a14]/95 backdrop-blur-md flex items-center justify-center p-4 md:p-12" onClick={() => setSelectedImage(null)}>
+          <div className="w-full max-w-6xl h-[80vh] bg-[#0a192f] border border-blue-900/30 shadow-2xl flex flex-col md:flex-row relative overflow-hidden" onClick={e => e.stopPropagation()}>
+
+            {/* Grid Background Pattern */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none"
+              style={{ backgroundImage: 'linear-gradient(#1e3a8a 1px, transparent 1px), linear-gradient(90deg, #1e3a8a 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
+            </div>
+
+            {/* Close Button */}
+            <button onClick={() => setSelectedImage(null)} className="absolute top-4 right-4 z-30 text-blue-400 hover:text-white bg-blue-900/20 p-2 rounded-full border border-blue-500/30">
+              <X className="w-6 h-6" />
+            </button>
+
+            {/* Left: Image View */}
+            <div className="w-full md:w-2/3 h-full bg-black relative flex items-center justify-center p-8 border-r border-blue-900/30">
+              <img src={selectedImage.url} className="max-h-full max-w-full object-contain shadow-[0_0_50px_rgba(30,58,138,0.3)]" alt="Blueprint View" />
+
+              {/* Image Markers */}
+              <div className="absolute top-4 left-4 text-[10px] text-blue-500 font-mono tracking-widest">FIG. 1.0 // RAW_ASSET</div>
+              <div className="absolute bottom-4 right-4 text-[10px] text-blue-500 font-mono tracking-widest">SCALE: 1:1</div>
+
+              {/* Crosshairs */}
+              <div className="absolute top-4 right-4 w-4 h-4 border-t border-r border-blue-500/50"></div>
+              <div className="absolute bottom-4 left-4 w-4 h-4 border-b border-l border-blue-500/50"></div>
+            </div>
+
+            {/* Right: Specs Panel */}
+            <div className="w-full md:w-1/3 h-full p-8 font-mono text-blue-200 flex flex-col relative z-10">
+              <div className="mb-8 border-b border-blue-900/50 pb-4">
+                <h3 className="text-2xl font-bold text-white mb-1 uppercase tracking-tighter">{selectedImage.filename}</h3>
+                <div className="text-xs text-blue-400 tracking-widest">CLASSIFIED // {selectedImage.category.toUpperCase()}</div>
+              </div>
+
+              <div className="space-y-6 flex-1 overflow-y-auto">
+                <div>
+                  <label className="text-[10px] text-blue-500 uppercase tracking-widest block mb-1">Description</label>
+                  <p className="text-sm leading-relaxed text-blue-100/80 border-l border-blue-500/30 pl-3">
+                    {selectedImage.description || "No description available for this asset."}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] text-blue-500 uppercase tracking-widest block mb-1">Date Captured</label>
+                    <div className="text-sm font-bold">{selectedImage.date}</div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-blue-500 uppercase tracking-widest block mb-1">Asset ID</label>
+                    <div className="text-sm font-bold">{selectedImage.id.slice(0, 8).toUpperCase()}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-blue-500 uppercase tracking-widest block mb-1">Technical Specs</label>
+                  <div className="text-xs space-y-1 text-blue-300/70">
+                    <div className="flex justify-between border-b border-blue-900/30 pb-1"><span>DIMENSIONS</span> <span>ORIGINAL</span></div>
+                    <div className="flex justify-between border-b border-blue-900/30 pb-1"><span>FORMAT</span> <span>DIGITAL</span></div>
+                    <div className="flex justify-between border-b border-blue-900/30 pb-1"><span>STATUS</span> <span>ARCHIVED</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-blue-900/50">
+                <div className="flex items-center gap-3 opacity-50">
+                  <div className="w-2 h-2 bg-blue-500 animate-pulse rounded-full"></div>
+                  <span className="text-[10px] tracking-widest">SECURE CONNECTION ESTABLISHED</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
