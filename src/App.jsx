@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { History, Hammer, Trash2, Lock, Unlock, Save, KeyRound, Upload, Loader2, Activity, Waves, Bike, Footprints, Flag, MapPin, ChevronDown, RefreshCw, X, Plus } from 'lucide-react';
+import BootSequence from './components/BootSequence';
 import { fetchActivities, processActivities } from './api/intervals';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -42,6 +43,7 @@ export default function App() {
   const [portfolioItems, setPortfolioItems] = useState([]);
   const [trainingLogs, setTrainingLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isBooting, setIsBooting] = useState(true);
 
   // Auth & Admin State
   const [user, setUser] = useState(null);
@@ -259,6 +261,8 @@ export default function App() {
   // --- RENDER ---
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-neutral-400 font-mono selection:bg-orange-900 selection:text-white">
+
+      {isBooting && <BootSequence onComplete={() => setIsBooting(false)} />}
 
       {/* NAV */}
       <nav className="fixed top-0 left-0 right-0 z-40 bg-[#0a0a0a]/90 border-b border-neutral-800 backdrop-blur-sm">
