@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { History, Hammer, Trash2, Lock, Unlock, Save, KeyRound, Upload, Loader2, Activity, Waves, Bike, Footprints, Flag, MapPin, ChevronDown, RefreshCw, X, Plus, Menu } from 'lucide-react';
 import BootSequence from './components/BootSequence';
 import { fetchActivities, processActivities } from './api/intervals';
+import { extractExif } from './utils/exif';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, onSnapshot, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
@@ -172,7 +173,11 @@ export default function App() {
 
     try {
       let imageUrl = '';
+      let exifData = null;
+
       if (imageFile) {
+        // Extract EXIF before compression (compression strips metadata)
+        exifData = await extractExif(imageFile);
         imageUrl = await compressImage(imageFile);
       }
 
@@ -181,6 +186,7 @@ export default function App() {
       await addDoc(collection(db, collectionName), {
         ...newItem,
         url: imageUrl,
+        exif: exifData, // Store EXIF data
         createdAt: serverTimestamp()
       });
 
@@ -688,21 +694,36 @@ export default function App() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] text-blue-500 uppercase tracking-widest block mb-1">Date Captured</label>
-                    <div className="text-sm font-bold">{selectedImage.date}</div>
+                    <label className="text-[10px] text-cyan-500 uppercase tracking-widest block mb-1 drop-shadow-[0_0_5px_cyan]">Date Captured</label>
+                    <div className="text-sm font-bold text-white">{selectedImage.exif?.date || selectedImage.date}</div>
                   </div>
                   <div>
-                    <label className="text-[10px] text-blue-500 uppercase tracking-widest block mb-1">Asset ID</label>
-                    <div className="text-sm font-bold">{selectedImage.id.slice(0, 8).toUpperCase()}</div>
+                    <label className="text-[10px] text-cyan-500 uppercase tracking-widest block mb-1 drop-shadow-[0_0_5px_cyan]">Asset ID</label>
+                    <div className="text-sm font-bold text-white">{selectedImage.id.slice(0, 8).toUpperCase()}</div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-blue-500 uppercase tracking-widest block mb-1">Technical Specs</label>
-                  <div className="text-xs space-y-1 text-blue-300/70">
-                    <div className="flex justify-between border-b border-blue-900/30 pb-1"><span>DIMENSIONS</span> <span>ORIGINAL</span></div>
-                    <div className="flex justify-between border-b border-blue-900/30 pb-1"><span>FORMAT</span> <span>DIGITAL</span></div>
-                    <div className="flex justify-between border-b border-blue-900/30 pb-1"><span>STATUS</span> <span>ARCHIVED</span></div>
+                  <label className="text-[10px] text-cyan-500 uppercase tracking-widest block mb-1 drop-shadow-[0_0_5px_cyan]">Technical Specs</label>
+                  <div className="text-xs space-y-1 text-cyan-300/70 font-mono">
+                    <div className="flex justify-between border-b border-cyan-900/30 pb-1">
+                      <span>CAMERA</span>
+                      <span className="text-white">{selectedImage.exif?.model || "UNKNOWN"}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-cyan-900/30 pb-1">
+                      <span>LENS</span>
+                      <span className="text-white">{selectedImage.exif?.lens || "UNKNOWN"}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-cyan-900/30 pb-1">
+                      <span>SETTINGS</span>
+                      <span className="text-white">
+                        {selectedImage.exif ? `${selectedImage.exif.iso || '-'} ISO | ${selectedImage.exif.aperture || '-'} | ${selectedImage.exif.shutterSpeed || '-'}` : "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-b border-cyan-900/30 pb-1">
+                      <span>COORDINATES</span>
+                      <span className="text-pink-500">{selectedImage.exif?.gps?.dms || "NO GPS DATA"}</span>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -50,7 +50,7 @@ export const processActivities = (activities) => {
       const durationMin = Math.round(activity.moving_time / 60);
 
       return {
-        externalId: String(activity.id), // Store original ID as string to prevent duplicates
+        externalId: String(activity.id),
         activityType,
         distance: distanceKm,
         duration: durationMin,
