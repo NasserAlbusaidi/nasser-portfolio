@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { History, Hammer, Trash2, Lock, Unlock, Save, KeyRound, Upload, Loader2, Activity, Waves, Bike, Footprints, Flag, MapPin, ChevronDown, RefreshCw, X, Plus, Menu, Dumbbell } from 'lucide-react';
+import { History, Hammer, Trash2, Lock, Unlock, Save, KeyRound, Upload, Loader2, Activity, Waves, Bike, Footprints, Flag, MapPin, ChevronDown, RefreshCw, X, Plus, Menu, Dumbbell, Pencil } from 'lucide-react';
 import BootSequence from './components/BootSequence';
 import { fetchActivities, processActivities } from './api/intervals';
 import { extractExif } from './utils/exif';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, doc, onSnapshot, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, doc, onSnapshot, addDoc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -72,6 +72,10 @@ export default function App() {
     distance: 0,
     duration: ''
   });
+
+  // Edit State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingLog, setEditingLog] = useState(null);
 
   // Sync State
   const [showSyncModal, setShowSyncModal] = useState(false);
@@ -264,6 +268,40 @@ export default function App() {
     if (!confirm("Scrap this entry?")) return;
     const col = type === 'portfolio' ? 'garage_items' : 'ironman_logs';
     await deleteDoc(doc(db, col, id));
+  };
+
+  const handleEdit = (log) => {
+    setEditingLog({ ...log });
+    setShowEditModal(true);
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    if (!user || !isUnlocked || !editingLog) return;
+    setIsUploading(true);
+
+    try {
+      let imageUrl = editingLog.url;
+      if (imageFile) {
+        imageUrl = await compressImage(imageFile);
+      }
+
+      await updateDoc(doc(db, 'ironman_logs', editingLog.id), {
+        ...editingLog,
+        url: imageUrl,
+        updatedAt: serverTimestamp()
+      });
+
+      alert("Log updated.");
+      setEditingLog(null);
+      setImageFile(null);
+      setShowEditModal(false);
+    } catch (error) {
+      console.error(error);
+      alert("Update failed.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const totals = calculateTotals();
@@ -488,15 +526,15 @@ export default function App() {
           {/* --- THE ROADMAP TIMELINE --- */}
           <div className="relative max-w-3xl mx-auto">
 
-            {/* Center Line */}
-            <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-px bg-neutral-800 transform md:-translate-x-1/2"></div>
+            {/* Center Line - INDUSTRIAL DASHED */}
+            <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-px border-l-2 border-dashed border-neutral-800 transform md:-translate-x-1/2"></div>
 
             {/* Finish Line Marker (Top) */}
             <div className="relative flex items-center mb-12 md:justify-center">
-              <div className="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center z-10 shadow-[0_0_20px_rgba(234,88,12,0.5)]">
+              <div className="w-8 h-8 bg-orange-600 flex items-center justify-center z-10 shadow-[0_0_20px_rgba(234,88,12,0.5)] border border-orange-400">
                 <Flag className="w-4 h-4 text-white" />
               </div>
-              <div className="ml-4 text-orange-500 font-bold tracking-widest text-xs">IRONMAN GOAL</div>
+              <div className="ml-4 text-orange-500 font-bold tracking-widest text-xs font-mono">IRONMAN GOAL</div>
             </div>
 
             {/* Logs */}
@@ -509,37 +547,45 @@ export default function App() {
               return (
                 <div key={log.id} className={`relative flex flex-col md:flex-row items-center mb-16 ${isLeft ? 'md:flex-row-reverse' : ''}`}>
 
-                  {/* Timeline Node */}
-                  <div className="absolute left-4 md:left-1/2 w-3 h-3 bg-[#0a0a0a] border-2 border-neutral-600 rounded-full z-10 transform -translate-x-[5px] md:-translate-x-1.5 mt-6 md:mt-0"></div>
+                  {/* Timeline Node - SQUARE INDUSTRIAL */}
+                  <div className="absolute left-4 md:left-1/2 w-4 h-4 bg-[#0a0a0a] border border-neutral-600 z-10 transform -translate-x-[7px] md:-translate-x-2 mt-6 md:mt-0"></div>
 
                   {/* Spacer for Desktop Alignment */}
                   <div className="hidden md:block w-1/2"></div>
 
-                  {/* Content Card */}
+                  {/* Content Card - BRUTALIST */}
                   <div className={`w-full md:w-[45%] pl-12 md:pl-0 ${isLeft ? 'md:pr-12 text-left md:text-right' : 'md:pl-12 text-left'}`}>
 
-                    <div className={`inline-flex items-center gap-2 mb-2 text-[10px] font-bold uppercase tracking-widest ${colorClass} ${isLeft ? 'md:flex-row-reverse' : ''}`}>
+                    <div className={`inline-flex items-center gap-2 mb-2 text-[10px] font-bold uppercase tracking-widest font-mono ${colorClass} ${isLeft ? 'md:flex-row-reverse' : ''}`}>
                       <Icon className="w-4 h-4" />
                       <span>{log.activityType} // {log.distance}KM</span>
                     </div>
 
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 hover:border-neutral-700 transition-colors group relative">
+                    <div className="bg-[#080808] border border-neutral-800 p-6 hover:border-neon-orange transition-colors group relative">
                       {isUnlocked && (
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(log.id, 'training') }}
-                          className="absolute top-2 right-2 text-neutral-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
-
-                      {log.url && (
-                        <div className="mb-3 rounded overflow-hidden aspect-video">
-                          <img src={log.url} className="w-full h-full object-cover opacity-90" alt="Log" />
+                        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={(e) => { e.stopPropagation(); handleEdit(log); }}
+                            className="text-neutral-600 hover:text-neon-green transition-colors">
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(log.id, 'training') }}
+                            className="text-neutral-600 hover:text-red-500 transition-colors">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
                       )}
 
-                      <p className="text-neutral-300 text-sm leading-relaxed mb-3">"{log.description}"</p>
+                      <div className="text-[10px] text-neutral-700 font-mono mb-2">LOG_ID: {log.id.slice(0, 8).toUpperCase()}</div>
 
-                      <div className={`text-[10px] text-neutral-600 uppercase tracking-wider flex gap-4 ${isLeft ? 'md:justify-end' : ''}`}>
+                      {log.url && (
+                        <div className="mb-4 overflow-hidden aspect-video border border-neutral-900">
+                          <img src={log.url} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0" alt="Log" />
+                        </div>
+                      )}
+
+                      <p className="text-neutral-300 text-sm leading-relaxed mb-4 font-mono">"{log.description}"</p>
+
+                      <div className={`text-[10px] text-neutral-600 uppercase tracking-wider flex gap-4 font-mono ${isLeft ? 'md:justify-end' : ''}`}>
                         <span>{log.date}</span>
                         {log.duration && <span>{log.duration} MIN</span>}
                       </div>
@@ -646,61 +692,76 @@ export default function App() {
         </div>
       )}
 
-      {/* Upload Modal */}
-      {/* {showUploadModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-neutral-900 p-8 rounded-xl w-full max-w-md border border-neutral-800 relative">
-            <button onClick={() => setShowUploadModal(false)} className="absolute top-4 right-4 text-neutral-500 hover:text-white"><X className="w-6 h-6" /></button>
-            <h2 className="text-2xl font-bold mb-6 text-white flex items-center gap-2">
-              <Upload className="w-5 h-5 text-orange-500" /> Upload Content
-            </h2>
-            <form onSubmit={handleUpload} className="space-y-4">
+      {/* --- EDIT MODAL --- */}
+      {showEditModal && editingLog && (
+        <div className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4">
+          <div className="bg-[#050505] border-2 border-neon-orange p-6 rounded-none shadow-[0_0_30px_rgba(255,95,0,0.2)] max-w-md w-full relative">
+            <button onClick={() => setShowEditModal(false)} className="absolute top-4 right-4 text-neon-orange hover:text-white"><X className="w-6 h-6" /></button>
+            <h3 className="text-neon-orange font-bold mb-6 flex items-center gap-2 tracking-widest uppercase">
+              <Pencil className="w-4 h-4" /> UPDATE_PROTOCOL // {editingLog.id.slice(0, 8)}
+            </h3>
+
+            <form onSubmit={handleUpdate} className="space-y-4 font-mono">
               <div>
-                <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">Type</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="type" value="portfolio" checked={uploadType === 'portfolio'} onChange={() => setUploadType('portfolio')} className="accent-orange-500" />
-                    <span className="text-sm text-neutral-300">Garage Item</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="type" value="roadmap" checked={uploadType === 'roadmap'} onChange={() => setUploadType('roadmap')} className="accent-orange-500" />
-                    <span className="text-sm text-neutral-300">Roadmap Log</span>
-                  </label>
-                </div>
+                <label className="text-[10px] font-bold text-neon-orange uppercase block mb-1 tracking-widest">Date</label>
+                <input type="date" required className="w-full bg-black border border-neutral-800 p-3 text-xs text-white outline-none focus:border-neon-orange"
+                  value={editingLog.date} onChange={e => setEditingLog({ ...editingLog, date: e.target.value })} />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">Image</label>
-                <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} className="w-full bg-black border border-neutral-800 text-neutral-300 text-sm p-2 rounded focus:border-orange-500 focus:outline-none" required />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">Filename / Title</label>
-                <input type="text" value={newItem.filename} onChange={e => setNewItem({ ...newItem, filename: e.target.value })} className="w-full bg-black border border-neutral-800 text-white text-sm p-2 rounded focus:border-orange-500 focus:outline-none" placeholder="e.g. Morning Run" required />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">Description</label>
-                <textarea value={newItem.description} onChange={e => setNewItem({ ...newItem, description: e.target.value })} className="w-full bg-black border border-neutral-800 text-white text-sm p-2 rounded focus:border-orange-500 focus:outline-none h-24" placeholder="Details..." />
-              </div>
-
-              {uploadType === 'portfolio' && (
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">Category</label>
-                  <select value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} className="w-full bg-black border border-neutral-800 text-white text-sm p-2 rounded focus:border-orange-500 focus:outline-none uppercase">
-                    {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+                  <label className="text-[10px] font-bold text-neon-orange uppercase block mb-1 tracking-widest">Type</label>
+                  <select className="w-full bg-black border border-neutral-800 p-3 text-xs text-white outline-none focus:border-neon-orange uppercase"
+                    value={editingLog.activityType} onChange={e => setEditingLog({ ...editingLog, activityType: e.target.value })}>
+                    <option value="swim">Swim</option>
+                    <option value="bike">Bike</option>
+                    <option value="run">Run</option>
+                    <option value="workout">Workout</option>
                   </select>
                 </div>
-              )}
+                <div>
+                  <label className="text-[10px] font-bold text-neon-orange uppercase block mb-1 tracking-widest">Dist (km)</label>
+                  <input type="number" step="0.1" className="w-full bg-black border border-neutral-800 p-3 text-xs text-white outline-none focus:border-neon-orange"
+                    value={editingLog.distance} onChange={e => setEditingLog({ ...editingLog, distance: e.target.value })} />
+                </div>
+              </div>
 
-              <button type="submit" disabled={isUploading} className="w-full bg-white text-black font-bold py-3 rounded hover:bg-neutral-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-neon-orange uppercase block mb-1 tracking-widest">Duration (min)</label>
+                <input type="number" className="w-full bg-black border border-neutral-800 p-3 text-xs text-white outline-none focus:border-neon-orange"
+                  value={editingLog.duration} onChange={e => setEditingLog({ ...editingLog, duration: e.target.value })} />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-neon-orange uppercase block mb-1 tracking-widest">Description</label>
+                <textarea rows="3" className="w-full bg-black border border-neutral-800 p-3 text-xs text-white outline-none focus:border-neon-orange"
+                  value={editingLog.description} onChange={e => setEditingLog({ ...editingLog, description: e.target.value })} />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-neon-orange uppercase block mb-1 tracking-widest">Update Visual</label>
+                <div className="relative group">
+                  <input type="file" accept="image/*" className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-20"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        setImageFile(e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <div className={`w-full bg-black border ${imageFile ? 'border-neon-green text-neon-green' : 'border-neutral-800 text-neutral-500'} p-3 text-xs flex items-center gap-2`}>
+                    <Upload className="w-3 h-3" /> {imageFile ? imageFile.name : "Select New Image..."}
+                  </div>
+                </div>
+              </div>
+
+              <button disabled={isUploading} className="w-full bg-neon-orange hover:bg-white text-black font-bold text-xs py-4 tracking-[0.2em] flex items-center justify-center gap-2 transition-colors">
                 {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {isUploading ? 'Uploading...' : 'Save Entry'}
+                {isUploading ? "OVERWRITING..." : "CONFIRM_UPDATE"}
               </button>
             </form>
           </div>
         </div>
-      )} */}
+      )}
 
       {/* --- SYNC MODAL --- */}
       {showSyncModal && (
