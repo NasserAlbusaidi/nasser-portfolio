@@ -19,7 +19,7 @@ export const fetchActivities = async (athleteId, apiKey, afterDate) => {
     if (!response.ok) {
       throw new Error(`Intervals.icu API Error: ${response.status} ${response.statusText}`);
     }
-
+    // console.log(await response.json());
     return await response.json();
   } catch (error) {
     console.error("Failed to fetch from Intervals.icu:", error);
@@ -33,7 +33,7 @@ export const fetchActivities = async (athleteId, apiKey, afterDate) => {
  * @returns {Array}
  */
 export const processActivities = (activities) => {
-  const ALLOWED_TYPES = ['Ride', 'Run', 'Swim'];
+  const ALLOWED_TYPES = ['Ride', 'Run', 'Swim', 'WeightTraining'];
 
   return activities
     .filter(activity => ALLOWED_TYPES.includes(activity.type))
@@ -42,6 +42,7 @@ export const processActivities = (activities) => {
       let activityType = 'run';
       if (activity.type === 'Ride') activityType = 'bike';
       if (activity.type === 'Swim') activityType = 'swim';
+      if (activity.type === 'WeightTraining') activityType = 'workout';
 
       // Convert distance from meters to km
       const distanceKm = (activity.distance / 1000).toFixed(2);
