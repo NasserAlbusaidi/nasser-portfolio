@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { History, Hammer, Trash2, Lock, Unlock, Save, KeyRound, Upload, Loader2, Activity, Waves, Bike, Footprints, Flag, MapPin, ChevronDown, RefreshCw, X, Plus, Menu, Dumbbell, Pencil } from 'lucide-react';
 import BootSequence from './components/BootSequence';
+import HolographicGauge from './components/HolographicGauge';
 import { fetchActivities, processActivities } from './api/intervals';
 import { extractExif } from './utils/exif';
+import { reverseGeocode } from './utils/geocoding';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, onSnapshot, addDoc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -185,6 +187,15 @@ export default function App() {
       if (imageFile) {
         // Extract EXIF before compression (compression strips metadata)
         exifData = await extractExif(imageFile);
+
+        // Reverse Geocode if GPS data exists
+        if (exifData && exifData.gps) {
+          const location = await reverseGeocode(exifData.gps.lat, exifData.gps.lng);
+          if (location) {
+            exifData.location = location;
+          }
+        }
+
         imageUrl = await compressImage(imageFile);
       }
 
@@ -304,11 +315,32 @@ export default function App() {
     }
   };
 
+  // --- 5. SCROLL ANIMATION OBSERVER ---
+  const RevealOnScroll = ({ children, className = "" }) => {
+    const [isVisible, setIsVisible] = useState(false);
+    const ref = React.useRef(null);
+
+    useEffect(() => {
+      const observer = new IntersectionObserver(([entry]) => {
+        if (entry.isIntersecting) setIsVisible(true);
+      }, { threshold: 0.1 });
+      if (ref.current) observer.observe(ref.current);
+      return () => observer.disconnect();
+    }, []);
+
+    return (
+      <div ref={ref} className={`${className} transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+        {children}
+      </div>
+    );
+  };
+
   const totals = calculateTotals();
 
   // --- RENDER ---
   return (
-    <div className="min-h-screen bg-[#050505] text-neutral-300 font-mono selection:bg-neon-orange selection:text-black">
+    <div className="min-h-screen bg-[#050505] text-neutral-300 font-mono selection:bg-neon-orange selection:text-black relative overflow-hidden">
+      <div className="scanlines-global"></div>
 
       {isBooting && <BootSequence onComplete={() => setIsBooting(false)} />}
 
@@ -407,9 +439,9 @@ export default function App() {
                 className="group relative cursor-pointer bg-black border border-neutral-800 hover:border-neon-green transition-colors duration-300">
 
                 {/* Image Container */}
-                <div className="aspect-[4/3] overflow-hidden relative">
+                <div className="aspect-[4/3] overflow-hidden relative chromatic-hover">
                   <img src={item.url} alt={item.filename} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-all duration-500 grayscale group-hover:grayscale-0" />
-                  <div className="scanline-effect"></div>
+                  <div className="scanline-sweep"></div>
                 </div>
 
                 {/* Metadata Block */}
@@ -479,46 +511,12 @@ export default function App() {
 
           {/* Dashboard Gauges */}
           {/* Dashboard Gauges */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-24">
-            {/* SWIM */}
-            <div className="bg-neutral-900/30 border border-neutral-800 p-5 rounded-lg relative overflow-hidden group hover:border-blue-900/50 transition-colors">
-              <div className="absolute top-0 left-0 h-0.5 bg-blue-500 transition-all duration-1000" style={{ width: `${Math.min((totals.swim / TARGETS.swim) * 100, 100)}%` }}></div>
-              <div className="flex justify-between items-start mb-4">
-                <Waves className="w-5 h-5 text-blue-500" />
-                <span className="text-[10px] text-neutral-600">{Math.round((totals.swim / TARGETS.swim) * 100)}% COMPLETE</span>
-              </div>
-              <div className="text-2xl font-bold text-white">{totals.swim.toFixed(1)} <span className="text-sm text-neutral-600 font-normal">/ {TARGETS.swim} km</span></div>
-            </div>
-
-            {/* BIKE */}
-            <div className="bg-neutral-900/30 border border-neutral-800 p-5 rounded-lg relative overflow-hidden group hover:border-orange-900/50 transition-colors">
-              <div className="absolute top-0 left-0 h-0.5 bg-orange-500 transition-all duration-1000" style={{ width: `${Math.min((totals.bike / TARGETS.bike) * 100, 100)}%` }}></div>
-              <div className="flex justify-between items-start mb-4">
-                <Bike className="w-5 h-5 text-orange-500" />
-                <span className="text-[10px] text-neutral-600">{Math.round((totals.bike / TARGETS.bike) * 100)}% COMPLETE</span>
-              </div>
-              <div className="text-2xl font-bold text-white">{totals.bike.toFixed(1)} <span className="text-sm text-neutral-600 font-normal">/ {TARGETS.bike} km</span></div>
-            </div>
-
-            {/* RUN */}
-            <div className="bg-neutral-900/30 border border-neutral-800 p-5 rounded-lg relative overflow-hidden group hover:border-green-900/50 transition-colors">
-              <div className="absolute top-0 left-0 h-0.5 bg-green-500 transition-all duration-1000" style={{ width: `${Math.min((totals.run / TARGETS.run) * 100, 100)}%` }}></div>
-              <div className="flex justify-between items-start mb-4">
-                <Footprints className="w-5 h-5 text-green-500" />
-                <span className="text-[10px] text-neutral-600">{Math.round((totals.run / TARGETS.run) * 100)}% COMPLETE</span>
-              </div>
-              <div className="text-2xl font-bold text-white">{totals.run.toFixed(1)} <span className="text-sm text-neutral-600 font-normal">/ {TARGETS.run} km</span></div>
-            </div>
-
-            {/* WORKOUTS */}
-            <div className="bg-neutral-900/30 border border-neutral-800 p-5 rounded-lg relative overflow-hidden group hover:border-red-900/50 transition-colors">
-              <div className="absolute top-0 left-0 h-0.5 bg-red-600 transition-all duration-1000" style={{ width: `${Math.min((totals.workout / TARGETS.workout) * 100, 100)}%` }}></div>
-              <div className="flex justify-between items-start mb-4">
-                <Dumbbell className="w-5 h-5 text-red-600" />
-                <span className="text-[10px] text-neutral-600">{Math.round((totals.workout / TARGETS.workout) * 100)}% COMPLETE</span>
-              </div>
-              <div className="text-2xl font-bold text-white">{totals.workout.toFixed(1)} <span className="text-sm text-neutral-600 font-normal">/ {TARGETS.workout} min</span></div>
-            </div>
+          {/* Dashboard Gauges */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-24">
+            <HolographicGauge value={totals.swim} max={TARGETS.swim} label="SWIM PROTOCOL" unit="KM" color="#3B82F6" />
+            <HolographicGauge value={totals.bike} max={TARGETS.bike} label="BIKE PROTOCOL" unit="KM" color="#F97316" />
+            <HolographicGauge value={totals.run} max={TARGETS.run} label="RUN PROTOCOL" unit="KM" color="#22C55E" />
+            <HolographicGauge value={totals.workout} max={TARGETS.workout} label="GYM PROTOCOL" unit="MIN" color="#EF4444" />
           </div>
 
 
@@ -527,7 +525,9 @@ export default function App() {
           <div className="relative max-w-3xl mx-auto">
 
             {/* Center Line - INDUSTRIAL DASHED */}
-            <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-px border-l-2 border-dashed border-neutral-800 transform md:-translate-x-1/2"></div>
+            {/* Center Line - ANIMATED */}
+            <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-neutral-800 to-transparent transform md:-translate-x-1/2"></div>
+            <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-neon-orange to-transparent transform md:-translate-x-1/2 opacity-20 animate-pulse"></div>
 
             {/* Finish Line Marker (Top) */}
             <div className="relative flex items-center mb-12 md:justify-center">
@@ -545,15 +545,17 @@ export default function App() {
               const colorClass = log.activityType === 'swim' ? 'text-blue-500' : log.activityType === 'bike' ? 'text-orange-500' : log.activityType === 'workout' ? 'text-red-600' : 'text-green-500';
 
               return (
-                <div key={log.id} className={`relative flex flex-col md:flex-row items-center mb-16 ${isLeft ? 'md:flex-row-reverse' : ''}`}>
+                <RevealOnScroll key={log.id} className={`relative flex flex-col md:flex-row items-center mb-16 ${isLeft ? 'md:flex-row-reverse' : ''}`}>
 
-                  {/* Timeline Node - SQUARE INDUSTRIAL */}
-                  <div className="absolute left-4 md:left-1/2 w-4 h-4 bg-[#0a0a0a] border border-neutral-600 z-10 transform -translate-x-[7px] md:-translate-x-2 mt-6 md:mt-0"></div>
+                  {/* Timeline Node - GLOWING */}
+                  <div className="absolute left-4 md:left-1/2 w-4 h-4 bg-black border border-neutral-600 z-10 transform -translate-x-[7px] md:-translate-x-2 mt-6 md:mt-0 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.1)] group-hover:border-neon-orange transition-colors">
+                    <div className={`w-2 h-2 rounded-full absolute top-1 left-1 ${log.activityType === 'swim' ? 'bg-blue-500' : log.activityType === 'bike' ? 'bg-orange-500' : log.activityType === 'workout' ? 'bg-red-500' : 'bg-green-500'} opacity-50`}></div>
+                  </div>
 
                   {/* Spacer for Desktop Alignment */}
                   <div className="hidden md:block w-1/2"></div>
 
-                  {/* Content Card - BRUTALIST */}
+                  {/* Content Card - GLITCH REVEAL */}
                   <div className={`w-full md:w-[45%] pl-12 md:pl-0 ${isLeft ? 'md:pr-12 text-left md:text-right' : 'md:pl-12 text-left'}`}>
 
                     <div className={`inline-flex items-center gap-2 mb-2 text-[10px] font-bold uppercase tracking-widest font-mono ${colorClass} ${isLeft ? 'md:flex-row-reverse' : ''}`}>
@@ -561,9 +563,12 @@ export default function App() {
                       <span>{log.activityType} // {log.distance}KM</span>
                     </div>
 
-                    <div className="bg-[#080808] border border-neutral-800 p-6 hover:border-neon-orange transition-colors group relative">
+                    <div className="bg-[#080808]/80 backdrop-blur-sm border border-neutral-800 p-6 hover:border-neon-orange transition-colors group relative overflow-hidden">
+                      {/* Scanline Sweep on Card */}
+                      <div className="scanline-sweep"></div>
+
                       {isUnlocked && (
-                        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                           <button onClick={(e) => { e.stopPropagation(); handleEdit(log); }}
                             className="text-neutral-600 hover:text-neon-green transition-colors">
                             <Pencil className="w-3 h-3" />
@@ -578,12 +583,12 @@ export default function App() {
                       <div className="text-[10px] text-neutral-700 font-mono mb-2">LOG_ID: {log.id.slice(0, 8).toUpperCase()}</div>
 
                       {log.url && (
-                        <div className="mb-4 overflow-hidden aspect-video border border-neutral-900">
+                        <div className="mb-4 overflow-hidden aspect-video border border-neutral-900 relative chromatic-hover">
                           <img src={log.url} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0" alt="Log" />
                         </div>
                       )}
 
-                      <p className="text-neutral-300 text-sm leading-relaxed mb-4 font-mono">"{log.description}"</p>
+                      <p className="text-neutral-300 text-sm leading-relaxed mb-4 font-mono group-hover:text-white transition-colors">"{log.description}"</p>
 
                       <div className={`text-[10px] text-neutral-600 uppercase tracking-wider flex gap-4 font-mono ${isLeft ? 'md:justify-end' : ''}`}>
                         <span>{log.date}</span>
@@ -592,7 +597,7 @@ export default function App() {
                     </div>
                   </div>
 
-                </div>
+                </RevealOnScroll>
               );
             })}
 
@@ -864,7 +869,16 @@ export default function App() {
                     </div>
                     <div className="flex justify-between">
                       <span>COORDINATES</span>
-                      <span className="text-neon-orange">{selectedImage.exif?.gps?.dms || "[NO GPS DATA]"}</span>
+                      <span className="text-neon-orange text-right">
+                        {selectedImage.exif?.location ? (
+                          <>
+                            <div>{selectedImage.exif.location.city}, {selectedImage.exif.location.country}</div>
+                            <div className="text-[8px] opacity-50">{selectedImage.exif.gps?.dms}</div>
+                          </>
+                        ) : (
+                          selectedImage.exif?.gps?.dms || "[NO GPS DATA]"
+                        )}
+                      </span>
                     </div>
                   </div>
                 </div>
