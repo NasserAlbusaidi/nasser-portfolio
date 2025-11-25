@@ -14,7 +14,8 @@ import Countdown from './components/system/Countdown';
 import { useNotification } from './contexts/NotificationContext';
 import HeatmapCalendar from './components/analytics/HeatmapCalendar';
 import ProgressCharts from './components/analytics/ProgressCharts';
-import PersonalRecords from './components/analytics/PersonalRecords'; // New import // New import // New import
+import PersonalRecords from './components/analytics/PersonalRecords';
+import ParticleBackground from './components/effects/ParticleBackground'; // New import // New import // New import // New import
 
 
 // --- FIREBASE CONFIGURATION ---
@@ -385,6 +386,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#050505] text-neutral-300 font-mono selection:bg-neon-orange selection:text-black relative overflow-hidden">
       <div className="scanlines-global"></div>
+      <ParticleBackground /> // Render the particle background
       {isBooting && <BootSequence onComplete={() => setIsBooting(false)} />}
 
       <nav className="fixed top-0 left-0 right-0 z-40 bg-[#050505]/95 border-b border-neutral-800 backdrop-blur-sm">
