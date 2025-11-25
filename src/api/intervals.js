@@ -57,7 +57,52 @@ export const processActivities = (activities) => {
         duration: durationMin,
         date: activity.start_date_local.split('T')[0], // YYYY-MM-DD
         description: activity.name,
-        source: 'intervals.icu'
+        source: 'intervals.icu',
+        // Additional detailed metrics
+        avgHeartRate: activity.average_heartrate || null,
+        maxPower: activity.max_watts || null,
+        avgSpeed: activity.average_speed || null,
       };
     });
+};
+
+/**
+ * Fetches map data for a specific activity from Intervals.icu API.
+ * @param {string} activityId
+ * @param {string} athleteId
+ * @param {string} apiKey
+ * @returns {Promise<object|null>} Parsed GeoJSON map data or null
+ */
+export const fetchActivityMap = async (activityId, athleteId, apiKey) => {
+  if (!activityId || !athleteId || !apiKey) return null;
+
+  const auth = btoa(`API_KEY:${apiKey}`);
+  const url = `https://intervals.icu/api/v1/activity/${activityId}/map`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Basic ${auth}`
+      }
+    });
+
+    if (!response.ok) {
+      // It's common for some activities to not have map data (e.g., manual entries)
+      // So, don't throw, just return null or log a warning.
+      console.warn(`No map data for activity ${activityId}: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    // The API now directly returns the map data object, not stringified GeoJSON
+    if (data && data.latlngs && data.latlngs.length > 0) {
+      return data;
+    }
+
+    return null;
+
+  } catch (error) {
+    console.error(`Failed to fetch map for activity ${activityId}:`, error);
+    return null;
+  }
 };

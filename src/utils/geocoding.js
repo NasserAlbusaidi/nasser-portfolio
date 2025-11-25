@@ -35,6 +35,7 @@ export const reverseGeocode = async (lat, lng) => {
 
             return {
                 city: city || 'Unknown Location',
+                state: data.address.state || '',
                 country: data.address.country || ''
             };
         }
