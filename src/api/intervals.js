@@ -7,7 +7,7 @@
  */
 export const fetchActivities = async (athleteId, apiKey, afterDate) => {
   const auth = btoa(`API_KEY:${apiKey}`);
-  const url = `https://intervals.icu/api/v1/athlete/${athleteId}/activities?oldest=${afterDate}&limit=200`; // Limit to avoid overwhelming
+  const url = `https://intervals.icu/api/v1/athlete/${athleteId}/activities?oldest=${afterDate}&limit=200`;
 
   try {
     const response = await fetch(url, {
@@ -19,8 +19,8 @@ export const fetchActivities = async (athleteId, apiKey, afterDate) => {
     if (!response.ok) {
       throw new Error(`Intervals.icu API Error: ${response.status} ${response.statusText}`);
     }
-    // console.log(await response.json());
-    return await response.json();
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error("Failed to fetch from Intervals.icu:", error);
     throw error;
@@ -38,16 +38,12 @@ export const processActivities = (activities) => {
   return activities
     .filter(activity => ALLOWED_TYPES.includes(activity.type))
     .map(activity => {
-      // Map Intervals types to our app types
       let activityType = 'run';
       if (activity.type === 'Ride') activityType = 'bike';
       if (activity.type === 'Swim') activityType = 'swim';
       if (activity.type === 'WeightTraining') activityType = 'workout';
 
-      // Convert distance from meters to km
       const distanceKm = (activity.distance / 1000).toFixed(2);
-
-      // Convert duration from seconds to minutes
       const durationMin = Math.round(activity.moving_time / 60);
 
       return {
@@ -55,13 +51,17 @@ export const processActivities = (activities) => {
         activityType,
         distance: distanceKm,
         duration: durationMin,
-        date: activity.start_date_local.split('T')[0], // YYYY-MM-DD
+        date: activity.start_date_local.split('T')[0],
         description: activity.name,
         source: 'intervals.icu',
-        // Additional detailed metrics
         avgHeartRate: activity.average_heartrate || null,
-        maxPower: activity.max_watts || null,
+        maxPower: activity.icu_pm_p_max || null,
         avgSpeed: activity.average_speed || null,
+        elevationGain: activity.total_elevation_gain || null,
+        avgCadence: activity.average_cadence || null,
+        maxHeartRate: activity.max_heartrate || null,
+        trainingLoad: activity.icu_training_load || null,
+        intensity: activity.icu_intensity || null,
       };
     });
 };
@@ -87,14 +87,11 @@ export const fetchActivityMap = async (activityId, athleteId, apiKey) => {
     });
 
     if (!response.ok) {
-      // It's common for some activities to not have map data (e.g., manual entries)
-      // So, don't throw, just return null or log a warning.
       console.warn(`No map data for activity ${activityId}: ${response.status} ${response.statusText}`);
       return null;
     }
 
     const data = await response.json();
-    // The API now directly returns the map data object, not stringified GeoJSON
     if (data && data.latlngs && data.latlngs.length > 0) {
       return data;
     }

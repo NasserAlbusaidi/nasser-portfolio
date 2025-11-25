@@ -234,20 +234,37 @@ const Biometrics = ({ log }) => {
 
   const metricsToRender = {
     bike: [
+      renderMetric('AVG PACE', log.avgSpeed ? `${(log.avgSpeed * 3.6).toFixed(1)} km/h` : null),
       renderMetric('MAX POWER', log.maxPower, 'W'),
       renderMetric('AVG HEART RATE', log.avgHeartRate, 'BPM'),
+      renderMetric('MAX HEART RATE', log.maxHeartRate, 'BPM'),
+      renderMetric('ELEVATION GAIN', log.elevationGain, 'm'),
+      renderMetric('AVG CADENCE', log.avgCadence, 'rpm'),
+      renderMetric('TRAINING LOAD', log.trainingLoad),
+      renderMetric('INTENSITY', log.intensity?.toFixed(1), '%'),
     ],
     run: [
       renderMetric('AVG PACE', getRunPace(log.avgSpeed), '/ km'),
       renderMetric('AVG HEART RATE', log.avgHeartRate, 'BPM'),
+      renderMetric('MAX HEART RATE', log.maxHeartRate, 'BPM'),
+      renderMetric('ELEVATION GAIN', log.elevationGain, 'm'),
+      renderMetric('AVG CADENCE', log.avgCadence, 'rpm'),
+      renderMetric('TRAINING LOAD', log.trainingLoad),
+      renderMetric('INTENSITY', log.intensity?.toFixed(1), '%'),
     ],
     swim: [
       renderMetric('AVG PACE', getSwimPace(log.avgSpeed), '/ 100m'),
       renderMetric('AVG HEART RATE', log.avgHeartRate, 'BPM'),
+      renderMetric('MAX HEART RATE', log.maxHeartRate, 'BPM'),
+      renderMetric('TRAINING LOAD', log.trainingLoad),
+      renderMetric('INTENSITY', log.intensity?.toFixed(1), '%'),
     ],
     workout: [
       renderMetric('DURATION', log.duration, 'min'),
       renderMetric('AVG HEART RATE', log.avgHeartRate, 'BPM'),
+      renderMetric('MAX HEART RATE', log.maxHeartRate, 'BPM'),
+      renderMetric('TRAINING LOAD', log.trainingLoad),
+      renderMetric('INTENSITY', log.intensity?.toFixed(1), '%'),
     ]
   };
 

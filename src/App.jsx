@@ -12,6 +12,10 @@ import LogBlueprintModal from './components/system/LogBlueprintModal';
 import ConfirmationModal from './components/system/ConfirmationModal';
 import Countdown from './components/system/Countdown';
 import { useNotification } from './contexts/NotificationContext';
+import HeatmapCalendar from './components/analytics/HeatmapCalendar';
+import ProgressCharts from './components/analytics/ProgressCharts';
+import PersonalRecords from './components/analytics/PersonalRecords'; // New import // New import // New import
+
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -312,6 +316,71 @@ export default function App() {
 
   const totals = calculateTotals();
 
+  // --- 5. ANALYTICS DATA PROCESSING ---
+  const dailyActivityTotals = useMemo(() => {
+    const totals = {};
+    trainingLogs.forEach(log => {
+      const date = log.date;
+      const distance = parseFloat(log.distance) || 0;
+      if (totals[date]) {
+        totals[date] += distance;
+      } else {
+        totals[date] = distance;
+      }
+    });
+    return totals;
+  }, [trainingLogs]);
+
+  // --- 6. WEEKLY CHART DATA PROCESSING ---
+  const weeklyChartData = useMemo(() => {
+    const data = {};
+    trainingLogs.forEach(log => {
+      const logDate = new Date(log.date);
+      const weekStart = new Date(logDate);
+      weekStart.setDate(logDate.getDate() - (logDate.getDay() + 6) % 7); // Adjust to Monday
+      weekStart.setHours(0, 0, 0, 0);
+
+      const weekKey = weekStart.toISOString().split('T')[0];
+
+      if (!data[weekKey]) {
+        data[weekKey] = { week: weekKey, swim: 0, bike: 0, run: 0, workout: 0 };
+      }
+
+      const value = parseFloat(log.distance) || parseFloat(log.duration) || 0;
+      data[weekKey][log.activityType] += value;
+    });
+    return Object.values(data).sort((a, b) => new Date(a.week) - new Date(b.week));
+  }, [trainingLogs]);
+
+  // --- 7. PERSONAL RECORDS PROCESSING ---
+  const personalRecords = useMemo(() => {
+    const prs = {
+      longestRun: { value: 0, date: null, id: null },
+      longestBike: { value: 0, date: null, id: null },
+      longestSwim: { value: 0, date: null, id: null },
+      highestMaxPower: { value: 0, date: null, id: null },
+    };
+
+    trainingLogs.forEach(log => {
+      const distance = parseFloat(log.distance) || 0;
+      const maxPower = parseFloat(log.maxPower) || 0;
+
+      if (log.activityType === 'run' && distance > prs.longestRun.value) {
+        prs.longestRun = { value: distance, date: log.date, id: log.id };
+      } else if (log.activityType === 'bike' && distance > prs.longestBike.value) {
+        prs.longestBike = { value: distance, date: log.date, id: log.id };
+      } else if (log.activityType === 'swim' && distance > prs.longestSwim.value) {
+        prs.longestSwim = { value: distance, date: log.date, id: log.id };
+      }
+
+      if (log.activityType === 'bike' && maxPower > prs.highestMaxPower.value) {
+        prs.highestMaxPower = { value: maxPower, date: log.date, id: log.id };
+      }
+    });
+
+    return prs;
+  }, [trainingLogs]);
+
   // --- RENDER ---
   return (
     <div className="min-h-screen bg-[#050505] text-neutral-300 font-mono selection:bg-neon-orange selection:text-black relative overflow-hidden">
@@ -327,6 +396,7 @@ export default function App() {
           <div className="hidden md:flex gap-8 text-xs font-bold tracking-[0.2em] uppercase">
             <a href="#garage" className="text-neutral-500 hover:text-neon-orange hover:underline decoration-2 underline-offset-4 transition-all">Archive</a>
             <a href="#roadmap" className="text-neutral-500 hover:text-neon-orange hover:underline decoration-2 underline-offset-4 transition-all">Mission</a>
+            <a href="#analytics" className="text-neutral-500 hover:text-neon-orange hover:underline decoration-2 underline-offset-4 transition-all">Analytics</a>
           </div>
           <div className="md:hidden">
             <button onClick={() => setIsMenuOpen(!isMenuOpen)}>{isMenuOpen ? <X className="w-6 h-6 text-white" /> : <Menu className="w-6 h-6 text-white" />}</button>
@@ -336,6 +406,7 @@ export default function App() {
           <div className="md:hidden bg-[#0a0a0a] py-4">
             <a href="#garage" className="block text-center text-sm uppercase py-2 hover:text-orange-500 transition-colors" onClick={() => setIsMenuOpen(false)}>The Garage</a>
             <a href="#roadmap" className="block text-center text-sm uppercase py-2 hover:text-orange-500 transition-colors" onClick={() => setIsMenuOpen(false)}>Mission Roadmap</a>
+            <a href="#analytics" className="block text-center text-sm uppercase py-2 hover:text-orange-500 transition-colors" onClick={() => setIsMenuOpen(false)}>Analytics</a>
           </div>
         )}
       </nav>
@@ -471,8 +542,18 @@ export default function App() {
             {trainingLogs.length === 0 && <div className="text-center py-12 text-neutral-600 text-xs">NO LOGS RECORDED YET. JOURNEY BEGINS NOW.</div>}
             <div className="relative flex items-center mt-12 md:justify-center"><div className="w-4 h-4 rounded-full bg-neutral-800 z-10"></div></div>
           </div>
-        </section>
-      </div>
+                </section>
+        
+                {/* --- SECTION 3: MISSION ANALYTICS --- */}
+                        <section id="analytics" className="py-24 px-6 border-t border-neutral-800 min-h-screen bg-[#050505]">
+                          <h1 className="text-5xl font-bold text-white text-center mb-12">Mission Analytics</h1>
+                                    <div className="flex justify-center mb-12">
+                                      <HeatmapCalendar activityData={dailyActivityTotals} year={new Date().getFullYear()} />
+                                    </div>
+                                              <ProgressCharts chartData={weeklyChartData} />
+                                              <PersonalRecords prData={personalRecords} />
+                                            </section>        
+              </div>
 
       {isUnlocked && (
         <div className="fixed bottom-6 right-6 z-30">
@@ -640,7 +721,7 @@ export default function App() {
                   <label className="text-[10px] text-neutral-600 uppercase tracking-widest block mb-2">Technical Specs</label>
                   <div className="text-xs space-y-2 text-neutral-400 font-mono border border-neutral-900 p-4 bg-[#080808]">
                     <div className="flex justify-between border-b border-neutral-900 pb-2"><span>CAMERA</span><span className="text-white">{selectedImage.exif?.model || "// UNKNOWN"}</span></div>
-                    <div className="flex justify-between border-b border-neutral-900 pb-2"><span>LENS</span><span className="text-white">{selectedİmage.exif?.lens || "// UNKNOWN"}</span></div>
+                    <div className="flex justify-between border-b border-neutral-900 pb-2"><span>LENS</span><span className="text-white">{selectedImage.exif?.lens || "// UNKNOWN"}</span></div>
                     <div className="flex justify-between border-b border-neutral-900 pb-2"><span>SETTINGS</span><span className="text-white">{selectedImage.exif ? `${selectedImage.exif.iso || '-'} ISO | ${selectedImage.exif.aperture || '-'} | ${selectedImage.exif.shutterSpeed || '-'}` : "N/A"}</span></div>
                     <div className="flex justify-between">
                       <span>LOCATION</span>
