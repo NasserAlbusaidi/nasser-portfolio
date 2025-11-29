@@ -50,15 +50,15 @@ const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
 export default function App() {
   const { addNotification } = useNotification();
-  
+
   // Modals and State
-  const [confirmationModal, setConfirmationModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  const [confirmationModal, setConfirmationModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => { } });
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedLog, setSelectedLog] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingLog, setEditingLog] = useState(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
-  
+
   // Navigation State
   const [filter, setFilter] = useState("All");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -262,7 +262,7 @@ export default function App() {
     setConfirmationModal({
       isOpen: true,
       title: 'CONFIRM DELETION',
-      message: `Are you sure you want to permanently scrap this entry? LOG_ID: ${id.slice(0,8).toUpperCase()}`,
+      message: `Are you sure you want to permanently scrap this entry? LOG_ID: ${id.slice(0, 8).toUpperCase()}`,
       onConfirm: async () => {
         const col = type === 'portfolio' ? 'garage_items' : 'ironman_logs';
         await deleteDoc(doc(db, col, id));
@@ -449,8 +449,8 @@ export default function App() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {portfolioItems.filter(i => filter === 'All' || i.category === filter).map(item => (
               <div key={item.id} onClick={() => setSelectedImage(item)} className="group relative cursor-pointer bg-black border border-neutral-800 hover:border-neon-green transition-colors duration-300">
-                <div className="aspect-[4/3] overflow-hidden relative chromatic-hover">
-                  <img src={item.url} alt={item.filename} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-all duration-500 grayscale group-hover:grayscale-0" />
+                <div className="aspect-auto md:aspect-[4/3] overflow-hidden relative chromatic-hover">
+                  <img src={item.url} alt={item.filename} className="w-full h-auto md:h-full object-cover opacity-60 group-hover:opacity-100 transition-all duration-500 grayscale group-hover:grayscale-0" />
                   <div className="scanline-sweep"></div>
                 </div>
                 <div className="p-6 border-t border-neutral-800 bg-[#080808] group-hover:bg-[#0a0a0a] transition-colors">
@@ -544,18 +544,18 @@ export default function App() {
             {trainingLogs.length === 0 && <div className="text-center py-12 text-neutral-600 text-xs">NO LOGS RECORDED YET. JOURNEY BEGINS NOW.</div>}
             <div className="relative flex items-center mt-12 md:justify-center"><div className="w-4 h-4 rounded-full bg-neutral-800 z-10"></div></div>
           </div>
-                </section>
-        
-                {/* --- SECTION 3: MISSION ANALYTICS --- */}
-                        <section id="analytics" className="py-24 px-6 border-t border-neutral-800 min-h-screen bg-[#050505]">
-                          <h1 className="text-5xl font-bold text-white text-center mb-12">Mission Analytics</h1>
-                                    <div className="flex justify-center mb-12">
-                                      <HeatmapCalendar activityData={dailyActivityTotals} year={new Date().getFullYear()} />
-                                    </div>
-                                              <ProgressCharts chartData={weeklyChartData} />
-                                              <PersonalRecords prData={personalRecords} />
-                                            </section>        
-              </div>
+        </section>
+
+        {/* --- SECTION 3: MISSION ANALYTICS --- */}
+        <section id="analytics" className="py-24 px-6 border-t border-neutral-800 min-h-screen bg-[#050505]">
+          <h1 className="text-5xl font-bold text-white text-center mb-12">Mission Analytics</h1>
+          <div className="flex justify-center mb-12">
+            <HeatmapCalendar activityData={dailyActivityTotals} year={new Date().getFullYear()} />
+          </div>
+          <ProgressCharts chartData={weeklyChartData} />
+          <PersonalRecords prData={personalRecords} />
+        </section>
+      </div>
 
       {isUnlocked && (
         <div className="fixed bottom-6 right-6 z-30">
@@ -694,12 +694,12 @@ export default function App() {
         <div className="fixed inset-0 z-[60] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 md:p-12" onClick={() => setSelectedImage(null)}>
           <div className="w-full max-w-7xl h-[85vh] bg-[#050505] border-2 border-neutral-800 flex flex-col md:flex-row relative overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)]" onClick={e => e.stopPropagation()}>
             <button onClick={() => setSelectedImage(null)} className="absolute top-0 right-0 z-30 text-white hover:text-neon-orange bg-black p-4 border-b border-l border-neutral-800 hover:bg-neutral-900 transition-colors"><X className="w-6 h-6" /></button>
-            <div className="w-full md:w-2/3 h-64 md:h-full shrink-0 bg-[#080808] relative flex items-center justify-center p-8 border-b-2 md:border-b-0 md:border-r-2 border-neutral-800">
+            <div className="w-full md:w-2/3 h-[40vh] md:h-full shrink-0 bg-[#080808] relative flex items-center justify-center p-8 border-b-2 md:border-b-0 md:border-r-2 border-neutral-800">
               <img src={selectedImage.url} className="max-h-full max-w-full object-contain" alt="Blueprint View" />
               <div className="absolute top-4 left-4 text-[10px] text-neon-green font-mono tracking-widest bg-black px-2 py-1 border border-neon-green/30">FIG. 1.0 // RAW_ASSET</div>
               <div className="absolute bottom-4 right-4 text-[10px] text-neon-green font-mono tracking-widest bg-black px-2 py-1 border border-neon-green/30">SCALE: 1:1</div>
             </div>
-            <div className="w-full md:w-1/3 h-full p-8 font-mono text-neutral-400 flex flex-col relative z-10 bg-[#050505] overflow-y-auto">
+            <div className="w-full md:w-1/3 h-full p-4 md:p-8 font-mono text-neutral-400 flex flex-col relative z-10 bg-[#050505] overflow-y-auto">
               <div className="mb-8 border-b-2 border-neutral-800 pb-6">
                 <h3 className="text-3xl font-black text-white mb-2 uppercase tracking-tighter">{selectedImage.description || selectedImage.filename?.split('.').slice(0, -1).join('.') || 'Untitled'}</h3>
                 <div className="text-xs text-neon-orange tracking-[0.2em] uppercase">CLASSIFIED // {selectedImage.category}</div>
@@ -733,9 +733,9 @@ export default function App() {
                             <span>{selectedImage.exif.location.state}</span>
                           ) : (
                             <span>
-                                {selectedImage.exif.location.city}
-                                {selectedImage.exif.location.state && `, ${selectedImage.exif.location.state}`}
-                                {!selectedImage.exif.location.state && selectedImage.exif.location.country && `, ${selectedImage.exif.location.country}`}
+                              {selectedImage.exif.location.city}
+                              {selectedImage.exif.location.state && `, ${selectedImage.exif.location.state}`}
+                              {!selectedImage.exif.location.state && selectedImage.exif.location.country && `, ${selectedImage.exif.location.country}`}
                             </span>
                           )
                         ) : (
