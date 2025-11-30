@@ -3,7 +3,7 @@ name: 🔄 Mission Control Sync
 
 on:
   schedule:
-    - cron: '0 6,18 * * *' # Runs at 6am and 6pm UTC
+    - cron: '0 2,8,14,20 * * *' # Runs at 2am, 8am, 2pm, 8pm UTC (6am, 12pm, 6pm, 12am Muscat)
   workflow_dispatch: # Allows manual trigger
 
 jobs:
