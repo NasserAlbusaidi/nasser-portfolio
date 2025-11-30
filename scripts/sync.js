@@ -16,6 +16,9 @@ if (!ATHLETE_ID || !API_KEY || !SERVICE_ACCOUNT) {
     console.log(`ATHLETE_ID: ${ATHLETE_ID ? 'SET' : 'MISSING'}`);
     console.log(`API_KEY: ${API_KEY ? 'SET' : 'MISSING'}`);
     console.log(`SERVICE_ACCOUNT: ${SERVICE_ACCOUNT ? 'SET' : 'MISSING'}`);
+    console.log(`🔍 DEBUG: Athlete ID being used: '${ATHLETE_ID}'`);
+    console.log(`🔍 DEBUG: API Key length: ${API_KEY.length}`);
+    console.log(`🔍 DEBUG: API Key starts with: ${API_KEY.substring(0, 4)}...`);
     process.exit(1);
 }
 
