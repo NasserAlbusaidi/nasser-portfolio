@@ -5,6 +5,7 @@ import MissionOverview from '../analytics/HeatmapCalendar';
 import ProgressCharts from '../analytics/ProgressCharts';
 import PersonalRecords from '../analytics/PersonalRecords';
 import BioMonitor from '../analytics/BioMonitor'; // <--- NEW IMPORT
+import RacePredictor from '../analytics/RacePredictor';
 
 export default function Analytics() {
     const { trainingLogs, wellnessLogs } = useStore(); // <--- Get wellnessLogs
@@ -88,29 +89,34 @@ export default function Analytics() {
                     </div>
                     <div className="flex items-center gap-2 text-neutral-500 text-xs font-mono border border-neutral-800 px-3 py-1 bg-[#0a0a0a]">
                         <Database className="w-3 h-3" />
-                        DATABASE_STATUS: <span className="text-neon-green">ONLINE</span>
+                    DATABASE_STATUS: <span className="text-neon-green">ONLINE</span>
                     </div>
                 </div>
 
-                <div className="space-y-8">
-                    {/* 1. Mission Overview */}
+                <div className="space-y-6">
+                    {/* Row 1: Mission Overview (Full Width) */}
                     <MissionOverview activityData={dailyActivityTotals} year={new Date().getFullYear()} />
 
-                    {/* 2. Bio Monitor (NEW) */}
+                    {/* Row 2: Bio Monitor (Full Width) */}
                     <BioMonitor wellnessData={wellnessLogs} />
 
-                    {/* 3. Charts & Records */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div className="flex flex-col gap-8">
-                            <ProgressCharts chartData={weeklyChartData} />
+                    {/* Row 3: The Split Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* Left Column: Volume Chart (Span 7/12) */}
+                        <div className="lg:col-span-7 flex flex-col">
+                            {/* We remove margin-top from chart component to fit perfectly */}
+                            <div className="h-full">
+                                <ProgressCharts chartData={weeklyChartData} />
+                            </div>
                         </div>
-                        <div className="flex flex-col justify-between">
-                            <PersonalRecords prData={personalRecords} />
 
-                            <div className="hidden lg:flex flex-1 items-center justify-center min-h-[100px] border border-dashed border-neutral-800 mt-8 opacity-30">
-                                <span className="text-[10px] tracking-[0.3em] text-neutral-600 uppercase">
-                                    [ Awaiting Future Protocols ]
-                                </span>
+                        {/* Right Column: Records & Forecast (Span 5/12) */}
+                        <div className="lg:col-span-5 flex flex-col gap-6">
+                            <PersonalRecords prData={personalRecords} />
+                            
+                            {/* Forecast fills remaining height naturally */}
+                            <div className="flex-1 min-h-[250px]">
+                                <RacePredictor logs={trainingLogs} />
                             </div>
                         </div>
                     </div>
