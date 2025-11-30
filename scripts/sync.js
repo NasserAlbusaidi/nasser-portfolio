@@ -1,40 +1,63 @@
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
-// 1. Setup Environment
-const ATHLETE_ID = process.env.VITE_INTERVALS_ATHLETE_ID;
-const API_KEY = process.env.VITE_INTERVALS_API_KEY;
-// The service account will be passed as a JSON string from GitHub Secrets
+// 1. Setup Environment (Added .trim() to clean inputs)
+const ATHLETE_ID = process.env.VITE_INTERVALS_ATHLETE_ID ? process.env.VITE_INTERVALS_ATHLETE_ID.trim() : null;
+const API_KEY = process.env.VITE_INTERVALS_API_KEY ? process.env.VITE_INTERVALS_API_KEY.trim() : null;
+
+// The service account is a JSON string, so we don't trim it, but we parse it carefully
 const SERVICE_ACCOUNT = process.env.FIREBASE_SERVICE_ACCOUNT
     ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
     : null;
 
 if (!ATHLETE_ID || !API_KEY || !SERVICE_ACCOUNT) {
-    console.error("❌ Missing Environment Variables. Ensure ATHLETE_ID, API_KEY, and FIREBASE_SERVICE_ACCOUNT are set.");
+    console.error("❌ Missing Environment Variables.");
+    // Debug log to see which one is missing (Masked for security)
+    console.log(`ATHLETE_ID: ${ATHLETE_ID ? 'SET' : 'MISSING'}`);
+    console.log(`API_KEY: ${API_KEY ? 'SET' : 'MISSING'}`);
+    console.log(`SERVICE_ACCOUNT: ${SERVICE_ACCOUNT ? 'SET' : 'MISSING'}`);
     process.exit(1);
 }
 
 // 2. Initialize Firebase Admin
-initializeApp({
-    credential: cert(SERVICE_ACCOUNT)
-});
+try {
+    initializeApp({
+        credential: cert(SERVICE_ACCOUNT)
+    });
+} catch (error) {
+    console.error("❌ Firebase Init Failed:", error.message);
+    process.exit(1);
+}
 
 const db = getFirestore();
 
 // 3. API Helper
 const fetchIntervals = async (endpoint) => {
-    const auth = Buffer.from(`API_KEY:${API_KEY}`).toString('base64');
-    const response = await fetch(`https://intervals.icu/api/v1/athlete/${ATHLETE_ID}${endpoint}`, {
+    // Ensure strict Basic Auth format: "API_KEY:your_actual_key"
+    const authString = `API_KEY:${API_KEY}`;
+    const auth = Buffer.from(authString).toString('base64');
+
+    const url = `https://intervals.icu/api/v1/athlete/${ATHLETE_ID}${endpoint}`;
+
+    const response = await fetch(url, {
         headers: { 'Authorization': `Basic ${auth}` }
     });
-    if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+
+    if (!response.ok) {
+        // Enhanced error logging
+        if (response.status === 403) {
+            throw new Error(`Forbidden (403): Check API_KEY permissions or ATHLETE_ID match. Target: ${ATHLETE_ID}`);
+        }
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
     return await response.json();
 };
 
 const run = async () => {
     console.log("🚀 Starting Sync Job...");
+    console.log(`👤 Target Athlete: ${ATHLETE_ID}`);
 
-    // Look back 7 days to catch any late edits
+    // Look back 7 days
     const lookbackDate = new Date();
     lookbackDate.setDate(lookbackDate.getDate() - 7);
     const afterDate = lookbackDate.toISOString().split('T')[0];
@@ -109,7 +132,7 @@ const run = async () => {
         process.exit(0);
 
     } catch (error) {
-        console.error("❌ Sync Failed:", error);
+        console.error("❌ Sync Failed:", error.message);
         process.exit(1);
     }
 };
