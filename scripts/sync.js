@@ -8,13 +8,6 @@ const SERVICE_ACCOUNT = process.env.FIREBASE_SERVICE_ACCOUNT
     ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
     : null;
 
-// --- DIAGNOSTIC LOGGING (Safe) ---
-console.log("--- CONFIG DIAGNOSIS ---");
-console.log(`ATHLETE_ID Length: ${ATHLETE_ID ? ATHLETE_ID.length : 'MISSING'}`);
-console.log(`API_KEY Length: ${API_KEY ? API_KEY.length : 'MISSING'}`);
-if (ATHLETE_ID && !ATHLETE_ID.startsWith('i')) console.warn("⚠️ WARNING: Athlete ID usually starts with 'i'. Check your secret.");
-console.log("------------------------");
-
 if (!ATHLETE_ID || !API_KEY || !SERVICE_ACCOUNT) {
     console.error("❌ Critical: Missing Secrets.");
     process.exit(1);
@@ -34,13 +27,14 @@ const db = getFirestore();
 
 // 3. API Helper
 const fetchIntervals = async (endpoint) => {
-    // Intervals.icu requires Basic Auth with "API_KEY" as the username
     const authString = `API_KEY:${API_KEY}`;
     const auth = Buffer.from(authString).toString('base64');
 
-    const url = `https://intervals.icu/api/v1/athlete/${ATHLETE_ID}${endpoint}`;
+    // Handle absolute vs relative URLs for flexibility
+    const url = endpoint.startsWith('http')
+        ? endpoint
+        : `https://intervals.icu/api/v1/athlete/${ATHLETE_ID}${endpoint}`;
 
-    // Added User-Agent to prevent 403 blocks
     const headers = {
         'Authorization': `Basic ${auth}`,
         'User-Agent': 'NasserPortfolio-Sync/1.0 (GitHub Actions)'
@@ -50,9 +44,10 @@ const fetchIntervals = async (endpoint) => {
 
     if (!response.ok) {
         if (response.status === 403) {
-            // Log the full response text if possible for clues
             const text = await response.text();
-            throw new Error(`403 Forbidden. Server says: ${text}`);
+            // Mask the key in logs if it appears
+            console.error(`⛔ 403 Forbidden. Endpoint: ${endpoint}`);
+            throw new Error(`Access Denied: ${text}`);
         }
         throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }
@@ -62,7 +57,26 @@ const fetchIntervals = async (endpoint) => {
 const run = async () => {
     console.log("🚀 Starting Sync Job...");
 
-    // Look back 7 days
+    // --- DIAGNOSTIC: WHO AM I? ---
+    try {
+        console.log("🕵️  Verifying Credentials...");
+        // Fetch the athlete profile associated with this API Key
+        const currentUser = await fetchIntervals('https://intervals.icu/api/v1/athlete/current');
+
+        console.log(`✅ API Key belongs to Athlete ID: ${currentUser.id}`);
+        console.log(`🎯 Target Athlete ID from Secrets: ${ATHLETE_ID}`);
+
+        if (currentUser.id !== ATHLETE_ID) {
+            console.error("❌ MISMATCH DETECTED: The API Key belongs to a different athlete!");
+            console.error("   -> Update your VITE_INTERVALS_ATHLETE_ID secret to match the Key's ID.");
+            process.exit(1);
+        }
+    } catch (error) {
+        console.error("❌ Auth Check Failed:", error.message);
+        process.exit(1);
+    }
+
+    // --- SYNC PROCESS ---
     const lookbackDate = new Date();
     lookbackDate.setDate(lookbackDate.getDate() - 7);
     const afterDate = lookbackDate.toISOString().split('T')[0];
@@ -71,7 +85,7 @@ const run = async () => {
         const batch = db.batch();
         let opCount = 0;
 
-        // --- SYNC WELLNESS ---
+        // Wellness
         console.log("🧬 Fetching Wellness Data...");
         const wellnessData = await fetchIntervals(`/wellness?oldest=${afterDate}`);
 
@@ -94,7 +108,7 @@ const run = async () => {
             });
         }
 
-        // --- SYNC ACTIVITIES ---
+        // Activities
         console.log("cYcLe: Fetching Activities...");
         const activities = await fetchIntervals(`/activities?oldest=${afterDate}&limit=50`);
         const ALLOWED = ['Ride', 'Run', 'Swim', 'WeightTraining'];
