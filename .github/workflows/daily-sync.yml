@@ -1,0 +1,29 @@
+name: 🔄 Mission Control Sync
+
+on:
+  schedule:
+    # Runs at 06:00 and 18:00 UTC daily
+    - cron: '0 6,18 * * *'
+  workflow_dispatch: # Allows you to click "Run Now" button manually
+
+jobs:
+  sync:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Sync Script
+        env:
+          VITE_INTERVALS_ATHLETE_ID: ${{ secrets.VITE_INTERVALS_ATHLETE_ID }}
+          VITE_INTERVALS_API_KEY: ${{ secrets.VITE_INTERVALS_API_KEY }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node scripts/sync.js
