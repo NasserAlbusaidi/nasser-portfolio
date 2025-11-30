@@ -7,28 +7,32 @@ export default function BootSequence({ onComplete }) {
     const [isExiting, setIsExiting] = useState(false);
     const bottomRef = useRef(null);
 
-    // Dynamic Boot Steps (Memoized to capture start time)
+    // Dynamic Boot Steps (Optimized for speed)
     const bootSteps = useMemo(() => {
         const now = new Date();
         const dateStr = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
         const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
 
         return [
-            { text: `BIOS DATE ${dateStr} ${timeStr} VER 2.4.0`, delay: 200 },
-            { text: "CPU: NEURAL ENGINE X-99 // 12 CORES ACTIVE", delay: 100 },
-            { text: "MEMORY TEST: 64GB OK", delay: 100 },
-            { text: " ", delay: 100 },
-            { text: "> MOUNT /DEV/MISSION_LOGS [ROOT]", typing: true, delay: 500 },
-            { text: "[ OK ] FILESYSTEM MOUNTED (READ-ONLY)", delay: 100 },
+            // Faster delays between static lines
+            { text: `BIOS DATE ${dateStr} ${timeStr} VER 2.4.0`, delay: 100 },
+            { text: "CPU: NEURAL ENGINE X-99 // 12 CORES ACTIVE", delay: 50 },
+            { text: "MEMORY TEST: 64GB OK", delay: 50 },
+            { text: " ", delay: 50 },
+            // Faster typing speed (15ms instead of default) and shorter delay after
+            { text: "> MOUNT /DEV/MISSION_LOGS [ROOT]", typing: true, speed: 15, delay: 200 },
+            { text: "[ OK ] FILESYSTEM MOUNTED (READ-ONLY)", delay: 50 },
             { text: "[ OK ] LOADED KERNEL MODULES", delay: 50 },
-            { text: "[ OK ] IRONMAN_PROTOCOL.SYS INITIALIZED", delay: 300, className: "text-orange-500" },
-            { text: "ESTABLISHING SECURE CONNECTION...", delay: 400 },
-            { text: "........................................", typing: true, speed: 5, delay: 0 },
-            { text: "ACCESS GRANTED.", delay: 200, className: "text-neon-green" },
-            { text: " ", delay: 100 },
-            { text: "> EXEC_VISUAL_MANIFESTO", typing: true, delay: 600 },
-            { text: "cYcLe: 1 // RENDERING GRAPHICS...", delay: 300 },
-            { text: "SYSTEM READY.", delay: 800, className: "text-white font-bold animate-pulse" }
+            { text: "[ OK ] IRONMAN_PROTOCOL.SYS INITIALIZED", delay: 150, className: "text-orange-500" },
+            { text: "ESTABLISHING SECURE CONNECTION...", delay: 200 },
+            // Super fast progress dots
+            { text: "........................................", typing: true, speed: 2, delay: 0 },
+            { text: "ACCESS GRANTED.", delay: 100, className: "text-neon-green" },
+            { text: " ", delay: 50 },
+            { text: "> EXEC_VISUAL_MANIFESTO", typing: true, speed: 15, delay: 300 },
+            { text: "cYcLe: 1 // RENDERING GRAPHICS...", delay: 200 },
+            // Shorter final pause
+            { text: "SYSTEM READY.", delay: 400, className: "text-white font-bold animate-pulse" }
         ];
     }, []);
 
@@ -45,7 +49,7 @@ export default function BootSequence({ onComplete }) {
             const exitTimer = setTimeout(() => {
                 setIsExiting(true);
                 setTimeout(onComplete, 800);
-            }, 1000);
+            }, 500); // Faster exit trigger
             return () => clearTimeout(exitTimer);
         }
 
@@ -95,7 +99,6 @@ export default function BootSequence({ onComplete }) {
                 }
             `}</style>
 
-            {/* Container updated for better full-screen feel while keeping terminal width reasonable */}
             <div className="w-full max-w-3xl h-full md:h-auto flex flex-col justify-end md:justify-start">
                 {lines.map((line, i) => (
                     <div key={i} className={`${line.className || 'text-neutral-400'} break-words mb-1`}>
@@ -106,7 +109,6 @@ export default function BootSequence({ onComplete }) {
                     </div>
                 ))}
 
-                {/* Typing Line */}
                 {currentText && (
                     <div className="text-white mb-1">
                         <span className="mr-4 opacity-30 select-none hidden md:inline-block">
@@ -117,7 +119,6 @@ export default function BootSequence({ onComplete }) {
                     </div>
                 )}
 
-                {/* Idle Cursor */}
                 {!currentText && !isExiting && (
                     <div className="mt-1">
                         <span className="inline-block w-2 h-4 bg-neon-green animate-blink shadow-[0_0_8px_rgba(0,255,65,0.8)]"></span>
@@ -127,7 +128,6 @@ export default function BootSequence({ onComplete }) {
                 <div ref={bottomRef}></div>
             </div>
 
-            {/* Decorative Mobile Footer */}
             <div className="md:hidden absolute bottom-4 left-0 right-0 text-center opacity-30 text-[10px] uppercase tracking-[0.2em] text-neutral-500">
                 // System Initialization...
             </div>

@@ -51,7 +51,8 @@ export default function App() {
     isBooting, setIsBooting,
     isUnlocked,
     modals, toggleModal, setConfirmationModal,
-    selectedLog, setSelectedLog
+    selectedLog, setSelectedLog,
+    wellnessLogs, setWellnessLogs
   } = useStore();
 
   const { addNotification } = useNotification();
@@ -89,8 +90,13 @@ export default function App() {
       }));
     });
 
-    return () => { unsubGarage(); unsubTraining(); };
-  }, [user, setPortfolioItems, setTrainingLogs, setLoading]);
+    const unsubWellness = onSnapshot(collection(db, 'daily_wellness'), (snap) => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setWellnessLogs(items.sort((a, b) => new Date(b.date) - new Date(a.date)));
+    });
+
+    return () => { unsubGarage(); unsubTraining(); unsubWellness(); };
+  }, [user, setPortfolioItems, setTrainingLogs, setLoading, setWellnessLogs]);
 
   return (
     <div className="min-h-screen bg-[#050505] text-neutral-300 font-mono selection:bg-neon-orange selection:text-black relative overflow-hidden">

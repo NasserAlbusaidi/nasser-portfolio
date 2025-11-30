@@ -1,13 +1,15 @@
 import React, { useMemo } from 'react';
+import { Activity, Database } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import HeatmapCalendar from '../analytics/HeatmapCalendar';
+import MissionOverview from '../analytics/HeatmapCalendar';
 import ProgressCharts from '../analytics/ProgressCharts';
 import PersonalRecords from '../analytics/PersonalRecords';
+import BioMonitor from '../analytics/BioMonitor'; // <--- NEW IMPORT
 
 export default function Analytics() {
-    const { trainingLogs } = useStore();
+    const { trainingLogs, wellnessLogs } = useStore(); // <--- Get wellnessLogs
 
-    // --- ANALYTICS DATA PROCESSING ---
+    // --- DATA PROCESSING ---
     const dailyActivityTotals = useMemo(() => {
         const totals = {};
         trainingLogs.forEach(log => {
@@ -22,13 +24,12 @@ export default function Analytics() {
         return totals;
     }, [trainingLogs]);
 
-    // --- WEEKLY CHART DATA PROCESSING ---
     const weeklyChartData = useMemo(() => {
         const data = {};
         trainingLogs.forEach(log => {
             const logDate = new Date(log.date);
             const weekStart = new Date(logDate);
-            weekStart.setDate(logDate.getDate() - (logDate.getDay() + 6) % 7); // Adjust to Monday
+            weekStart.setDate(logDate.getDate() - (logDate.getDay() + 6) % 7);
             weekStart.setHours(0, 0, 0, 0);
 
             const weekKey = weekStart.toISOString().split('T')[0];
@@ -43,7 +44,6 @@ export default function Analytics() {
         return Object.values(data).sort((a, b) => new Date(a.week) - new Date(b.week));
     }, [trainingLogs]);
 
-    // --- PERSONAL RECORDS PROCESSING ---
     const personalRecords = useMemo(() => {
         const prs = {
             longestRun: { value: 0, date: null, id: null },
@@ -73,13 +73,49 @@ export default function Analytics() {
     }, [trainingLogs]);
 
     return (
-        <section id="analytics" className="py-24 px-6 border-t border-neutral-800 min-h-screen bg-[#050505]">
-            <h1 className="text-5xl font-bold text-white text-center mb-12">Mission Analytics</h1>
-            <div className="flex justify-center mb-12">
-                <HeatmapCalendar activityData={dailyActivityTotals} year={new Date().getFullYear()} />
+        <section id="analytics" className="py-24 border-t border-neutral-800 min-h-screen bg-[#050505] relative">
+            <div className="absolute top-0 left-0 right-0 h-96 bg-[linear-gradient(to_bottom,rgba(255,95,0,0.05)_1px,transparent_1px),linear-gradient(to_right,rgba(255,95,0,0.05)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none"></div>
+
+            <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
+                <div className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                    <div>
+                        <div className="flex items-center gap-2 text-neon-orange text-[10px] font-bold tracking-[0.2em] uppercase mb-2">
+                            <Activity className="w-4 h-4" /> System Metrics
+                        </div>
+                        <h1 className="text-4xl md:text-6xl font-bold text-white tracking-tighter uppercase font-orbitron">
+                            Mission <span className="text-transparent bg-clip-text bg-gradient-to-r from-neutral-500 to-neutral-700">Analytics</span>
+                        </h1>
+                    </div>
+                    <div className="flex items-center gap-2 text-neutral-500 text-xs font-mono border border-neutral-800 px-3 py-1 bg-[#0a0a0a]">
+                        <Database className="w-3 h-3" />
+                        DATABASE_STATUS: <span className="text-neon-green">ONLINE</span>
+                    </div>
+                </div>
+
+                <div className="space-y-8">
+                    {/* 1. Mission Overview */}
+                    <MissionOverview activityData={dailyActivityTotals} year={new Date().getFullYear()} />
+
+                    {/* 2. Bio Monitor (NEW) */}
+                    <BioMonitor wellnessData={wellnessLogs} />
+
+                    {/* 3. Charts & Records */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="flex flex-col gap-8">
+                            <ProgressCharts chartData={weeklyChartData} />
+                        </div>
+                        <div className="flex flex-col justify-between">
+                            <PersonalRecords prData={personalRecords} />
+
+                            <div className="hidden lg:flex flex-1 items-center justify-center min-h-[100px] border border-dashed border-neutral-800 mt-8 opacity-30">
+                                <span className="text-[10px] tracking-[0.3em] text-neutral-600 uppercase">
+                                    [ Awaiting Future Protocols ]
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <ProgressCharts chartData={weeklyChartData} />
-            <PersonalRecords prData={personalRecords} />
         </section>
     );
 }

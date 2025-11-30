@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { RefreshCw, X, Loader2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useNotification } from '../../contexts/NotificationContext';
-import { fetchActivities, processActivities } from '../../api/intervals';
-import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { fetchActivities, processActivities, fetchWellness } from '../../api/intervals';
+import { doc, updateDoc, addDoc, setDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../App';
 
 export default function SyncModal() {
@@ -27,11 +27,13 @@ export default function SyncModal() {
             return;
         }
         setIsSyncing(true);
-        let addedCount = 0, updatedCount = 0, skippedCount = 0;
+        let addedCount = 0, updatedCount = 0, skippedCount = 0, wellnessCount = 0;
 
         try {
             localStorage.setItem('intervals_athlete_id', syncConfig.athleteId);
             localStorage.setItem('intervals_api_key', syncConfig.apiKey);
+
+            // --- 1. SYNC TRAINING LOGS ---
             const rawActivities = await fetchActivities(syncConfig.athleteId, syncConfig.apiKey, syncConfig.afterDate);
             const processed = processActivities(rawActivities);
             const existingIds = new Set(trainingLogs.map(l => String(l.externalId)));
@@ -49,7 +51,31 @@ export default function SyncModal() {
                     addedCount++;
                 }
             }
-            addNotification(`Sync complete. Added: ${addedCount}, Updated: ${updatedCount}, Skipped: ${skippedCount}`, "success");
+
+            // --- 2. SYNC WELLNESS DATA (Bio-Monitor) ---
+            const wellnessData = await fetchWellness(syncConfig.athleteId, syncConfig.apiKey, syncConfig.afterDate);
+
+            for (const day of wellnessData) {
+                // ID in wellness is the date "YYYY-MM-DD"
+                if (day.id) {
+                    const docId = `wellness_${day.id}`;
+                    const docRef = doc(db, 'daily_wellness', docId);
+
+                    await setDoc(docRef, {
+                        date: day.id,
+                        restingHR: day.restingHR || null,
+                        steps: day.steps || 0,
+                        sleepSecs: day.sleepSecs || null,
+                        spO2: day.spO2 || null,
+                        hrv: day.hrv || null, // rMSSD typically
+                        weight: day.weight || null,
+                        updatedAt: serverTimestamp()
+                    }, { merge: true });
+                    wellnessCount++;
+                }
+            }
+
+            addNotification(`Sync complete. Training: +${addedCount} / ^${updatedCount}. Wellness: ${wellnessCount} days updated.`, "success");
             toggleModal('sync', false);
         } catch (error) {
             console.error(error);

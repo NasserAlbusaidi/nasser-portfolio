@@ -28,6 +28,31 @@ export const fetchActivities = async (athleteId, apiKey, afterDate) => {
 };
 
 /**
+ * Fetches daily wellness data (HR, Sleep, Steps, etc.)
+ * @param {string} athleteId 
+ * @param {string} apiKey 
+ * @param {string} afterDate 
+ * @returns {Promise<Array>}
+ */
+export const fetchWellness = async (athleteId, apiKey, afterDate) => {
+  const auth = btoa(`API_KEY:${apiKey}`);
+  // Fetching wellness data starting from 'afterDate'
+  const url = `https://intervals.icu/api/v1/athlete/${athleteId}/wellness?oldest=${afterDate}`;
+
+  try {
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Basic ${auth}` }
+    });
+
+    if (!response.ok) throw new Error("Wellness fetch failed");
+    return await response.json();
+  } catch (error) {
+    console.error("Wellness API Error:", error);
+    return [];
+  }
+};
+
+/**
  * Processes raw activities into application format
  * @param {Array} activities 
  * @returns {Array}
