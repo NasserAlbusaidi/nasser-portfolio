@@ -30,10 +30,10 @@ export const extractExif = async (file) => {
         };
 
         return {
-            make: output.Make,
-            model: output.Model,
-            lens: output.LensModel || output.LensInfo,
-            iso: output.ISO,
+            make: output.Make || null,
+            model: output.Model || null,
+            lens: output.LensModel || output.LensInfo || null,
+            iso: output.ISO || null,
             aperture: output.FNumber ? `f/${output.FNumber}` : null,
             shutterSpeed: output.ExposureTime ? (output.ExposureTime < 1 ? `1/${Math.round(1 / output.ExposureTime)}` : `${output.ExposureTime}s`) : null,
             focalLength: output.FocalLength ? `${output.FocalLength}mm` : null,
