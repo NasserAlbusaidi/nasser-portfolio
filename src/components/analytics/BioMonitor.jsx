@@ -1,12 +1,22 @@
 import React from 'react';
 import { Footprints, Heart, Moon, Activity } from 'lucide-react';
-import { AreaChart, Area, BarChart, Bar, ResponsiveContainer, Tooltip, Cell } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, ResponsiveContainer, Tooltip, Cell, XAxis, YAxis } from 'recharts';
 
 const BioMonitor = ({ wellnessData }) => {
-    // Get last 14 days for trends, last 5 for steps
-    const recentData = wellnessData.slice(-14);
-    const last5Days = wellnessData.slice(-5);
-    const today = wellnessData[wellnessData.length - 1] || {};
+    // 1. Safe Sort (Oldest -> Newest)
+    const sortedData = [...wellnessData].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // 2. Get recent slices
+    const recentData = sortedData.slice(-14); // 2 weeks for sparkline
+    const last5Days = sortedData.slice(-7);   // 7 days for bar chart
+
+    // 3. Get the absolute latest entry
+    const latestEntry = sortedData[sortedData.length - 1] || {};
+
+    // 4. Date Display Logic
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isToday = latestEntry.date === todayStr;
+    const displayDate = latestEntry.date ? new Date(latestEntry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '--';
 
     const formatSleep = (secs) => {
         if (!secs) return "--";
@@ -15,8 +25,23 @@ const BioMonitor = ({ wellnessData }) => {
         return `${hrs}h ${mins}m`;
     };
 
+    // Custom Tooltip Component to reuse style
+    const BrutalistTooltip = ({ active, payload, label, unit, color }) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="bg-black border border-neutral-800 p-2 shadow-xl">
+                    <div className="text-[9px] text-neutral-500 font-mono mb-1 uppercase tracking-wider">{label}</div>
+                    <div className="text-xs font-bold font-mono text-white">
+                        <span style={{ color: color }}>{payload[0].value}</span> {unit}
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    };
+
     if (wellnessData.length === 0) return (
-        <div className="w-full bg-[#0a0a0a] border border-neutral-800 p-6 flex flex-col items-center justify-center text-neutral-600 space-y-2">
+        <div className="w-full bg-[#0a0a0a] border border-neutral-800 p-6 flex flex-col items-center justify-center text-neutral-600 space-y-2 font-mono">
             <Activity className="w-6 h-6" />
             <span className="text-xs uppercase tracking-widest">Awaiting Bio-Telemetry...</span>
         </div>
@@ -27,38 +52,55 @@ const BioMonitor = ({ wellnessData }) => {
 
             {/* 1. CARDIOVASCULAR STATUS */}
             <div className="bg-[#0a0a0a] border border-neutral-800 p-5 relative overflow-hidden group">
-                {/* Decorative Elements */}
                 <div className="absolute top-0 right-0 w-20 h-20 bg-red-900/10 blur-2xl rounded-full -mr-10 -mt-10"></div>
-                <div className="flex justify-between items-start mb-6 relative z-10">
+
+                <div className="flex justify-between items-start mb-4 relative z-10">
                     <div>
                         <div className="flex items-center gap-2 text-red-500 text-[10px] font-bold tracking-widest uppercase mb-1">
-                            <Heart className="w-3 h-3" /> Resting H.R.
+                            <Heart className="w-3 h-3" /> Resting H.R. <span className="text-neutral-600">[{displayDate}]</span>
                         </div>
                         <div className="flex items-baseline gap-2">
                             <div className="text-4xl text-white font-bold tracking-tighter">
-                                {today.restingHR || "--"}
+                                {latestEntry.restingHR || "--"}
                             </div>
                             <span className="text-xs text-neutral-500 font-bold">BPM</span>
                         </div>
                     </div>
-                    {today.hrv && (
+                    {latestEntry.hrv && (
                         <div className="text-right">
                             <div className="text-[9px] text-neutral-500 uppercase tracking-widest mb-1">HRV (rMSSD)</div>
-                            <div className="text-xl text-neutral-300">{today.hrv} <span className="text-[10px] text-neutral-600">ms</span></div>
+                            <div className="text-xl text-neutral-300">{latestEntry.hrv} <span className="text-[10px] text-neutral-600">ms</span></div>
                         </div>
                     )}
                 </div>
 
-                {/* Sparkline for RHR */}
-                <div className="h-16 w-full opacity-60 group-hover:opacity-100 transition-opacity">
+                {/* RHR Area Chart */}
+                <div className="h-24 w-full opacity-80 group-hover:opacity-100 transition-opacity">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={recentData}>
+                        <AreaChart data={recentData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="colorHr" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3} />
                                     <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
+                            <XAxis
+                                dataKey="date"
+                                tickFormatter={(str) => new Date(str).toLocaleDateString('en-US', { day: 'numeric' })}
+                                tick={{ fill: '#444', fontSize: 9, fontFamily: 'monospace' }}
+                                axisLine={false}
+                                tickLine={false}
+                                interval="preserveStartEnd"
+                                minTickGap={10}
+                            />
+                            <YAxis
+                                domain={['dataMin - 2', 'dataMax + 2']}
+                                hide={true}
+                            />
+                            <Tooltip
+                                content={<BrutalistTooltip unit="BPM" color="#EF4444" />}
+                                cursor={{ stroke: '#333', strokeWidth: 1, strokeDasharray: '2 2' }}
+                            />
                             <Area
                                 type="monotone"
                                 dataKey="restingHR"
@@ -80,17 +122,17 @@ const BioMonitor = ({ wellnessData }) => {
                 <div className="flex justify-between items-start mb-2 relative z-10">
                     <div>
                         <div className="flex items-center gap-2 text-blue-500 text-[10px] font-bold tracking-widest uppercase mb-1">
-                            <Footprints className="w-3 h-3" /> Step Volume
+                            <Footprints className="w-3 h-3" /> Step Volume <span className={isToday ? "text-neon-green" : "text-neutral-500"}>[{displayDate}]</span>
                         </div>
                         <div className="text-2xl text-white font-bold tracking-tighter">
-                            {today.steps ? today.steps.toLocaleString() : "--"}
+                            {latestEntry.steps ? latestEntry.steps.toLocaleString() : "--"}
                         </div>
                     </div>
                     <div className="text-right">
                         <div className="flex items-center justify-end gap-2 text-purple-500 text-[10px] font-bold tracking-widest uppercase mb-1">
                             <Moon className="w-3 h-3" /> Last Sleep
                         </div>
-                        <div className="text-xl text-neutral-300">{formatSleep(today.sleepSecs)}</div>
+                        <div className="text-xl text-neutral-300">{formatSleep(latestEntry.sleepSecs)}</div>
                     </div>
                 </div>
 
@@ -98,22 +140,25 @@ const BioMonitor = ({ wellnessData }) => {
                 <div className="h-24 w-full mt-2">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={last5Days} barCategoryGap="20%">
+                            <XAxis
+                                dataKey="date"
+                                tickFormatter={(str) => new Date(str).toLocaleDateString('en-US', { weekday: 'narrow' })}
+                                tick={{ fill: '#444', fontSize: 9, fontFamily: 'monospace' }}
+                                axisLine={false}
+                                tickLine={false}
+                                interval={0}
+                            />
                             <Tooltip
                                 cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                        return (
-                                            <div className="bg-black border border-neutral-800 p-2 text-[10px] text-white font-mono shadow-xl">
-                                                <span className="text-blue-400">STEPS:</span> {payload[0].value.toLocaleString()}
-                                            </div>
-                                        );
-                                    }
-                                    return null;
-                                }}
+                                content={<BrutalistTooltip unit="STEPS" color="#3B82F6" />}
                             />
                             <Bar dataKey="steps" radius={[2, 2, 0, 0]} isAnimationActive={true}>
                                 {last5Days.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={index === last5Days.length - 1 ? '#3B82F6' : '#1e293b'} />
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill={index === last5Days.length - 1 ? '#3B82F6' : '#1e293b'}
+                                        className="transition-all hover:opacity-80"
+                                    />
                                 ))}
                             </Bar>
                         </BarChart>
