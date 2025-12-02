@@ -38,7 +38,7 @@ export default function GlobalOps() {
     }, []);
 
     return (
-        <section className="py-24 px-4 md:px-8 min-h-[80vh] border-t border-neutral-800 bg-[#050505] relative overflow-hidden">
+        <section className="py-16 px-4 md:px-8 min-h-[80vh] border-t border-neutral-800 bg-[#050505] relative overflow-hidden">
 
             {/* Header */}
             <div className="mb-12 flex justify-between items-end relative z-10 pointer-events-none">
