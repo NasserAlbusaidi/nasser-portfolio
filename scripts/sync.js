@@ -128,42 +128,78 @@ const run = async () => {
             });
         }
 
-        // --- SYNC ACTIVITIES ---
-        // console.log("cYcLe: Fetching Activities...");
-        // const activities = await fetchIntervals(`/activities?oldest=${afterDate}&limit=50`);
-        // const ALLOWED = ['Ride', 'Run', 'Swim', 'WeightTraining'];
+        // --- SYNC ACTIVITIES (With De-Duplication) ---
+        console.log("cYcLe: Fetching Activities...");
+        
+        // 1. Load existing logs to create a map of ExternalID -> FirestoreID
+        // This prevents creating duplicates if the app uses random IDs
+        const existingLogsSnapshot = await db.collection('ironman_logs').select('externalId').get();
+        const existingLogsMap = new Map(); // Map<ExternalID, DocID>
+        
+        existingLogsSnapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.externalId) {
+                existingLogsMap.set(String(data.externalId), doc.id);
+            }
+        });
+        console.log(`📂 Found ${existingLogsMap.size} existing logs in database.`);
 
-        // if (Array.isArray(activities)) {
-        //     activities.forEach(act => {
-        //         if (!ALLOWED.includes(act.type)) return;
+        // 2. Fetch new data
+        const activities = await fetchIntervals(`/activities?oldest=${afterDate}&limit=50`);
+        const ALLOWED = ['Ride', 'Run', 'Swim', 'WeightTraining'];
 
-        //         const docRef = db.collection('ironman_logs').doc(String(act.id));
-        //         let activityType = 'run';
-        //         if (act.type === 'Ride') activityType = 'bike';
-        //         if (act.type === 'Swim') activityType = 'swim';
-        //         if (act.type === 'WeightTraining') activityType = 'workout';
+        if (Array.isArray(activities)) {
+            activities.forEach(act => {
+                if (!ALLOWED.includes(act.type)) return;
 
-        //         batch.set(docRef, {
-        //             externalId: String(act.id),
-        //             activityType,
-        //             distance: (act.distance / 1000).toFixed(2),
-        //             duration: Math.round(act.moving_time / 60),
-        //             date: act.start_date_local.split('T')[0],
-        //             description: act.name,
-        //             source: 'intervals.icu',
-        //             avgHeartRate: act.average_heartrate || null,
-        //             maxPower: act.icu_pm_p_max || null,
-        //             avgSpeed: act.average_speed || null,
-        //             elevationGain: act.total_elevation_gain || null,
-        //             avgCadence: act.average_cadence || null,
-        //             maxHeartRate: act.max_heartrate || null,
-        //             trainingLoad: act.icu_training_load || null,
-        //             intensity: act.icu_intensity || null,
-        //             updatedAt: new Date()
-        //         }, { merge: true });
-        //         opCount++;
-        //     });
-        // }
+                const externalId = String(act.id);
+                let docRef;
+                let isNew = false;
+
+                // Check if we already have this activity
+                if (existingLogsMap.has(externalId)) {
+                    // Update existing document
+                    const docId = existingLogsMap.get(externalId);
+                    docRef = db.collection('ironman_logs').doc(docId);
+                } else {
+                    // Create NEW document with random ID
+                    docRef = db.collection('ironman_logs').doc();
+                    isNew = true;
+                }
+
+                let activityType = 'run';
+                if (act.type === 'Ride') activityType = 'bike';
+                if (act.type === 'Swim') activityType = 'swim';
+                if (act.type === 'WeightTraining') activityType = 'workout';
+
+                const payload = {
+                    externalId,
+                    activityType,
+                    distance: (act.distance / 1000).toFixed(2),
+                    duration: Math.round(act.moving_time / 60),
+                    date: act.start_date_local.split('T')[0],
+                    description: act.name,
+                    source: 'intervals.icu',
+                    avgHeartRate: act.average_heartrate || null,
+                    maxPower: act.icu_pm_p_max || null,
+                    avgSpeed: act.average_speed || null,
+                    elevationGain: act.total_elevation_gain || null,
+                    avgCadence: act.average_cadence || null,
+                    maxHeartRate: act.max_heartrate || null,
+                    trainingLoad: act.icu_training_load || null,
+                    intensity: act.icu_intensity || null,
+                    updatedAt: new Date()
+                };
+
+                // Only set createdAt if it's a brand new document
+                if (isNew) {
+                    payload.createdAt = new Date();
+                }
+
+                batch.set(docRef, payload, { merge: true });
+                opCount++;
+            });
+        }
 
         if (opCount > 0) {
             await batch.commit();
