@@ -140,8 +140,8 @@ const run = async () => {
             }
         });
         console.log(`📂 Found ${existingLogsMap.size} existing logs in database.`);
-
-        const activitiesDateStart = '2025-11-20';
+        // get today's date
+        const activitiesDateStart = new Date().toISOString().split('T')[0];
 
         const activities = await fetchIntervals(`/activities?oldest=${activitiesDateStart}&limit=50`);
         const ALLOWED = ['Ride', 'Run', 'Swim', 'WeightTraining'];
