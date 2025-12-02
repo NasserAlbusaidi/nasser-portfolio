@@ -89,7 +89,7 @@ export default function Analytics() {
                     </div>
                     <div className="flex items-center gap-2 text-neutral-500 text-xs font-mono border border-neutral-800 px-3 py-1 bg-[#0a0a0a]">
                         <Database className="w-3 h-3" />
-                    DATABASE_STATUS: <span className="text-neon-green">ONLINE</span>
+                        DATABASE_STATUS: <span className="text-neon-green">ONLINE</span>
                     </div>
                 </div>
 
@@ -113,7 +113,7 @@ export default function Analytics() {
                         {/* Right Column: Records & Forecast (Span 5/12) */}
                         <div className="lg:col-span-5 flex flex-col gap-6">
                             <PersonalRecords prData={personalRecords} />
-                            
+
                             {/* Forecast fills remaining height naturally */}
                             <div className="flex-1 min-h-[250px]">
                                 <RacePredictor logs={trainingLogs} />
