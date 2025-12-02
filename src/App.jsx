@@ -13,6 +13,7 @@ import Navigation from './components/ui/Navigation';
 import Garage from './components/sections/Garage';
 import Roadmap from './components/sections/Roadmap';
 import Analytics from './components/sections/Analytics';
+import GlobalOps from './components/sections/GlobalOps';
 
 import UploadModal from './components/modals/UploadModal';
 import EditLogModal from './components/modals/EditLogModal';
@@ -111,6 +112,7 @@ export default function App() {
         <Garage />
         <Roadmap />
         <Analytics />
+        <GlobalOps />
       </div>
 
       {isUnlocked && (

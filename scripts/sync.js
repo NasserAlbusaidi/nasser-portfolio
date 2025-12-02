@@ -1,17 +1,16 @@
-import 'dotenv/config'; // <--- Loads variables from .env automatically
+import 'dotenv/config';
 import fs from 'fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { execSync } from 'child_process'; // <--- 1. ADDED THIS
 
 // 1. Setup Environment
-// Try to load Service Account from Env (CI/CD) OR Local File (Dev)
 let serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
     ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
     : null;
 
 if (!serviceAccount) {
     try {
-        // Fallback: Look for local file
         if (fs.existsSync('./service-account.json')) {
             const rawData = fs.readFileSync('./service-account.json', 'utf8');
             serviceAccount = JSON.parse(rawData);
@@ -45,8 +44,6 @@ console.log("---------------------------\n");
 
 if (!ATHLETE_ID || !API_KEY || !serviceAccount) {
     console.error("❌ Critical: Missing Secrets.");
-    console.error("   -> Locally: Ensure .env has VITE_ vars and service-account.json exists.");
-    console.error("   -> GitHub: Ensure Secrets are set correctly.");
     process.exit(1);
 }
 
@@ -93,13 +90,15 @@ const fetchIntervals = async (endpoint) => {
 const run = async () => {
     console.log("🚀 Starting Sync Job...");
 
+    // Look back 30 days to ensure we catch recent edits/uploads
     const lookbackDate = new Date();
-    lookbackDate.setDate(lookbackDate.getDate() - 5); // Grab last 30 days for initial pop
+    lookbackDate.setDate(lookbackDate.getDate() - 30);
     const afterDate = lookbackDate.toISOString().split('T')[0];
 
     try {
         const batch = db.batch();
         let opCount = 0;
+        let newMapActivities = 0; // <--- 2. TRACK NEW MAPS
 
         // --- TEST ACCESS ---
         await fetchIntervals('/wellness?oldest=' + new Date().toISOString().split('T')[0]);
@@ -131,10 +130,8 @@ const run = async () => {
         // --- SYNC ACTIVITIES (With De-Duplication) ---
         console.log("cYcLe: Fetching Activities...");
         
-        // 1. Load existing logs to create a map of ExternalID -> FirestoreID
-        // This prevents creating duplicates if the app uses random IDs
         const existingLogsSnapshot = await db.collection('ironman_logs').select('externalId').get();
-        const existingLogsMap = new Map(); // Map<ExternalID, DocID>
+        const existingLogsMap = new Map();
         
         existingLogsSnapshot.forEach(doc => {
             const data = doc.data();
@@ -144,8 +141,9 @@ const run = async () => {
         });
         console.log(`📂 Found ${existingLogsMap.size} existing logs in database.`);
 
-        // 2. Fetch new data
-        const activities = await fetchIntervals(`/activities?oldest=${afterDate}&limit=50`);
+        const activitiesDateStart = '2025-11-20';
+
+        const activities = await fetchIntervals(`/activities?oldest=${activitiesDateStart}&limit=50`);
         const ALLOWED = ['Ride', 'Run', 'Swim', 'WeightTraining'];
 
         if (Array.isArray(activities)) {
@@ -156,13 +154,10 @@ const run = async () => {
                 let docRef;
                 let isNew = false;
 
-                // Check if we already have this activity
                 if (existingLogsMap.has(externalId)) {
-                    // Update existing document
                     const docId = existingLogsMap.get(externalId);
                     docRef = db.collection('ironman_logs').doc(docId);
                 } else {
-                    // Create NEW document with random ID
                     docRef = db.collection('ironman_logs').doc();
                     isNew = true;
                 }
@@ -171,6 +166,12 @@ const run = async () => {
                 if (act.type === 'Ride') activityType = 'bike';
                 if (act.type === 'Swim') activityType = 'swim';
                 if (act.type === 'WeightTraining') activityType = 'workout';
+
+                // <--- 3. CHECK IF WE NEED TO RUN MAP SYNC
+                // Only if it's NEW and it's a Map-compatible type
+                if (isNew && (activityType === 'bike' || activityType === 'run')) {
+                    newMapActivities++;
+                }
 
                 const payload = {
                     externalId,
@@ -191,7 +192,6 @@ const run = async () => {
                     updatedAt: new Date()
                 };
 
-                // Only set createdAt if it's a brand new document
                 if (isNew) {
                     payload.createdAt = new Date();
                 }
@@ -203,9 +203,24 @@ const run = async () => {
 
         if (opCount > 0) {
             await batch.commit();
-            console.log(`✅ Sync Complete. Updated ${opCount} records.`);
+            console.log(`✅ Sync Complete. Updated/Created ${opCount} records.`);
         } else {
             console.log("✅ No new data to sync.");
+        }
+
+        // <--- 4. TRIGGER MAP SYNC IF NEEDED
+        if (newMapActivities > 0) {
+            console.log(`\n🗺️ Detected ${newMapActivities} new Run/Bike activities.`);
+            console.log("🔄 Triggering Map Sync...");
+            try {
+                // This runs your other script automatically
+                execSync('node scripts/map-sync.js', { stdio: 'inherit' });
+            } catch (err) {
+                console.error("❌ Map Sync encountered an error (check logs above).");
+                // We don't exit(1) here because the main data sync was successful
+            }
+        } else {
+            console.log("⏩ Skipping Map Sync (No new compatible activities).");
         }
 
         process.exit(0);
