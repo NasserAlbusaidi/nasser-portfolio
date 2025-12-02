@@ -9,10 +9,10 @@ const PersonalRecords = ({ prData }) => {
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
     }).toUpperCase();
   };
 
@@ -35,13 +35,13 @@ const PersonalRecords = ({ prData }) => {
           const Icon = rec.icon;
           return (
             <div key={index} className="group relative flex flex-col items-center justify-center p-6 bg-[#0a0a0a] border border-[#222] rounded-lg overflow-hidden transition-all duration-300 hover:border-[#444] hover:bg-[#0f0f0f]">
-              
+
               {/* Subtle ambient glow behind the icon */}
               <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 ${rec.bg} opacity-0 group-hover:opacity-10 blur-2xl transition-opacity duration-500`} />
 
               <Icon className={`w-8 h-8 mb-3 ${rec.color} relative z-10`} strokeWidth={1.5} />
 
-              <div className="text-[10px] text-neutral-500 uppercase tracking-[0.2em] mb-2">{rec.label}</div>
+              <div className="text-[10px] text-neutral-500 uppercase tracking-[0.2em] mb-2 text-center">{rec.label}</div>
 
               <div className="flex items-baseline gap-1 relative z-10">
                 <span className="text-3xl font-bold text-white tracking-tighter">
