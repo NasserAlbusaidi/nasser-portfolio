@@ -15,25 +15,29 @@ if (!API_KEY) {
 }
 
 // --- INIT FIREBASE ---
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) 
-    : JSON.parse(fs.readFileSync('./service-account.json', 'utf8'));
+let serviceAccount;
+try {
+    serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+        : JSON.parse(fs.readFileSync('./service-account.json', 'utf8'));
+} catch (e) {
+    console.error("❌ Service Account Error:", e.message);
+    process.exit(1);
+}
 
-try { initializeApp({ credential: cert(serviceAccount) }); } catch(e) {}
+initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 
 // --- API HELPER ---
 const fetchActivityMap = async (activityId) => {
     const auth = Buffer.from(`API_KEY:${API_KEY}`).toString('base64');
     const url = `https://intervals.icu/api/v1/activity/${activityId}/map`;
-    
+
     try {
         const res = await fetch(url, { headers: { 'Authorization': `Basic ${auth}` } });
         if (!res.ok) return null;
-        
+
         const json = await res.json();
-        
-        // Return valid coordinates if they exist
         if (json && json.latlngs && json.latlngs.length > 0) {
             return json.latlngs;
         }
@@ -46,18 +50,15 @@ const fetchActivityMap = async (activityId) => {
 // --- COORDINATE PROCESSOR ---
 const processCoordinates = (coords) => {
     if (!Array.isArray(coords)) return [];
-    
     const valid = [];
-    // Optimization: Keep every 5th point to reduce file size (adjustable)
+    // Keep every 5th point to reduce file size
     for (let i = 0; i < coords.length; i += 5) {
         const p = coords[i];
-        
-        // Handle [lat, lng] array format (Intervals default)
+        // Handle [lat, lng] array (Intervals default) -> Convert to [lng, lat] for Mapbox
         if (Array.isArray(p) && p.length >= 2) {
-            // Mapbox expects [Longitude, Latitude], Intervals gives [Lat, Lng]
-            valid.push([p[1], p[0]]); 
-        } 
-        // Handle {lat, lng} object format (Just in case)
+            valid.push([p[1], p[0]]);
+        }
+        // Handle {lat, lng} object
         else if (p && typeof p === 'object') {
             const lat = p.lat || p[0];
             const lng = p.lng || p.lon || p[1];
@@ -68,81 +69,94 @@ const processCoordinates = (coords) => {
 };
 
 const run = async () => {
-    console.log("🌍 Starting Global Ops Map Sync...");
+    console.log("🌍 GLOBAL OPS: Map Sync Sequence Initiated...");
 
-    // 1. Load Cache (Prevents re-downloading existing maps)
+    // 1. Load Cache
     let cache = {};
     if (fs.existsSync(CACHE_FILE)) {
-        try { cache = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8')); } catch (e) {}
+        try { cache = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8')); } catch (e) { }
     }
 
-    // 2. Scan Firestore
-    console.log("🔥 Scanning Firestore...");
+    // 2. Scan Firestore (The Source of Truth)
+    console.log("🔥 Scanning Firestore for Active Operations...");
     const logs = await db.collection('ironman_logs').get();
-    
-    let queue = [];
+
+    let dbActivities = [];
     logs.forEach(doc => {
         const data = doc.data();
-        // Use externalId or id, prioritizing externalId as per your DB structure
-        let rawId = data.externalId || data.id;
-        
+        const rawId = data.externalId || data.id; // Handle both formats
         if (rawId && (data.activityType === 'bike' || data.activityType === 'run')) {
-            queue.push({ id: String(rawId), type: data.activityType });
+            dbActivities.push({ id: String(rawId), type: data.activityType });
         }
     });
 
-    console.log(`📂 Found ${queue.length} activities.`);
+    console.log(`📂 Database holds ${dbActivities.length} mappable missions.`);
 
-    // 3. Process Queue
-    let newCount = 0;
-    const features = [];
-    let successCount = 0;
+    // 3. "Deep Check" - Find Missing Plots
+    // Logic: If it's in the DB but NOT in the cache, we must fetch it.
+    const missingFromCache = dbActivities.filter(act => !cache[act.id]);
 
-    for (const act of queue) {
-        let coords = cache[act.id];
+    if (missingFromCache.length > 0) {
+        console.log(`⚠️ DETECTED ${missingFromCache.length} MISSING PLOTS. INITIATING RETRIEVAL...`);
 
-        // Fetch if not in cache
-        if (!coords) {
-            process.stdout.write(`   ⬇️  Downloading ${act.type} ${act.id}... `);
+        let fetchedCount = 0;
+        for (const act of missingFromCache) {
+            process.stdout.write(`   ⬇️  Downloading ${act.type} [${act.id}]... `);
+
             const rawMapData = await fetchActivityMap(act.id);
-            
+
             if (rawMapData) {
-                coords = processCoordinates(rawMapData);
+                const coords = processCoordinates(rawMapData);
                 if (coords.length > 0) {
-                    console.log(`✅ OK (${coords.length} pts)`);
                     cache[act.id] = coords;
-                    newCount++;
+                    fetchedCount++;
+                    console.log(`✅ OK (${coords.length} pts)`);
                 } else {
-                    console.log(`⚠️ Bad Format`);
+                    console.log(`⚠️ Invalid Data`);
                 }
             } else {
-                console.log(`❌ No Map Data`);
+                console.log(`❌ No Map Found (Indoor?)`);
+                // Optional: Mark as 'no_map' in cache to prevent infinite retries? 
+                // For now, we leave it to retry in case API was just temp down.
             }
-            // Be nice to the API rate limits
-            await new Promise(r => setTimeout(r, 200));
+
+            // Rate Limit safety
+            await new Promise(r => setTimeout(r, 250));
         }
 
-        // Add to GeoJSON
+        if (fetchedCount > 0) {
+            fs.writeFileSync(CACHE_FILE, JSON.stringify(cache));
+            console.log(`💾 Cache Updated: +${fetchedCount} new traces.`);
+        }
+    } else {
+        console.log("✅ All missions accounted for. Cache is synced.");
+    }
+
+    // 4. Rebuild GeoJSON (Always rebuild to ensure file integrity)
+    console.log("🗺️  Re-assembling Global Map Data...");
+    const features = [];
+    let totalPoints = 0;
+
+    // Only add activities that are currently in the DB (handles deletions)
+    for (const act of dbActivities) {
+        const coords = cache[act.id];
         if (coords && coords.length > 0) {
             features.push({
                 type: "Feature",
                 properties: { type: act.type, id: act.id },
                 geometry: { type: "LineString", coordinates: coords }
             });
-            successCount++;
+            totalPoints += coords.length;
         }
-    }
-
-    // 4. Save Updates
-    if (newCount > 0) {
-        fs.writeFileSync(CACHE_FILE, JSON.stringify(cache));
-        console.log(`\n💾 Cache updated with ${newCount} new traces.`);
     }
 
     const geoJSON = { type: "FeatureCollection", features: features };
     fs.writeFileSync(OUTPUT_FILE, JSON.stringify(geoJSON));
 
-    console.log(`\n🎉 DONE! Generated ${successCount} paths in ${OUTPUT_FILE}`);
+    console.log(`🎉 OPERATION COMPLETE.`);
+    console.log(`   > Total Paths: ${features.length}`);
+    console.log(`   > Map File:    ${OUTPUT_FILE}`);
+
     process.exit(0);
 };
 

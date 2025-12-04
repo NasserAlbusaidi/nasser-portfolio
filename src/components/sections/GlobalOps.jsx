@@ -19,9 +19,13 @@ export default function GlobalOps() {
 
     // Load the GeoJSON we generated
     useEffect(() => {
-        fetch('/mission_paths.json')
+        // Add ?t=timestamp to bypass browser cache
+        fetch(`/mission_paths.json?t=${new Date().getTime()}`)
             .then(res => res.json())
-            .then(data => setMapData(data))
+            .then(data => {
+                setMapData(data);
+                console.log(`🗺️ Map Loaded: ${data.features.length} paths`);
+            })
             .catch(err => console.error("Map Data Offline:", err));
     }, []);
 

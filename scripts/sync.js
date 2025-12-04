@@ -2,7 +2,7 @@ import 'dotenv/config';
 import fs from 'fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { execSync } from 'child_process'; // <--- 1. ADDED THIS
+import { execSync } from 'child_process';
 
 // 1. Setup Environment
 let serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
@@ -23,6 +23,7 @@ if (!serviceAccount) {
 
 const ATHLETE_ID = process.env.VITE_INTERVALS_ATHLETE_ID ? process.env.VITE_INTERVALS_ATHLETE_ID.trim() : null;
 const API_KEY = process.env.VITE_INTERVALS_API_KEY ? process.env.VITE_INTERVALS_API_KEY.trim() : null;
+const MAP_CACHE_FILE = './scripts/map-cache.json'; // <--- LOAD CACHE FILE PATH
 
 // --- CREDENTIAL DIAGNOSTICS ---
 console.log("\n🔍 --- CONFIG CHECK ---");
@@ -90,15 +91,21 @@ const fetchIntervals = async (endpoint) => {
 const run = async () => {
     console.log("🚀 Starting Sync Job...");
 
-    // Look back 30 days to ensure we catch recent edits/uploads
+    // Look back 30 days for wellness
     const lookbackDate = new Date();
     lookbackDate.setDate(lookbackDate.getDate() - 30);
     const afterDate = lookbackDate.toISOString().split('T')[0];
 
+    // <--- 1. LOAD MAP CACHE (To check for missing plots) --->
+    let mapCache = {};
+    if (fs.existsSync(MAP_CACHE_FILE)) {
+        try { mapCache = JSON.parse(fs.readFileSync(MAP_CACHE_FILE, 'utf8')); } catch (e) { }
+    }
+
     try {
         const batch = db.batch();
         let opCount = 0;
-        let newMapActivities = 0; // <--- 2. TRACK NEW MAPS
+        let pendingMapSync = false; // Flag to trigger map sync
 
         // --- TEST ACCESS ---
         await fetchIntervals('/wellness?oldest=' + new Date().toISOString().split('T')[0]);
@@ -129,10 +136,10 @@ const run = async () => {
 
         // --- SYNC ACTIVITIES (With De-Duplication) ---
         console.log("cYcLe: Fetching Activities...");
-        
+
         const existingLogsSnapshot = await db.collection('ironman_logs').select('externalId').get();
         const existingLogsMap = new Map();
-        
+
         existingLogsSnapshot.forEach(doc => {
             const data = doc.data();
             if (data.externalId) {
@@ -140,8 +147,9 @@ const run = async () => {
             }
         });
         console.log(`📂 Found ${existingLogsMap.size} existing logs in database.`);
-        // get today's date
-        const activitiesDateStart = new Date().toISOString().split('T')[0];
+
+        // <--- 2. FIXED DATE: Start from Nov 20, 2025 to catch "yesterday's run" --->
+        const activitiesDateStart = '2025-11-20';
 
         const activities = await fetchIntervals(`/activities?oldest=${activitiesDateStart}&limit=50`);
         const ALLOWED = ['Ride', 'Run', 'Swim', 'WeightTraining'];
@@ -155,9 +163,11 @@ const run = async () => {
                 let isNew = false;
 
                 if (existingLogsMap.has(externalId)) {
+                    // It exists in DB
                     const docId = existingLogsMap.get(externalId);
                     docRef = db.collection('ironman_logs').doc(docId);
                 } else {
+                    // It is NEW
                     docRef = db.collection('ironman_logs').doc();
                     isNew = true;
                 }
@@ -167,10 +177,20 @@ const run = async () => {
                 if (act.type === 'Swim') activityType = 'swim';
                 if (act.type === 'WeightTraining') activityType = 'workout';
 
-                // <--- 3. CHECK IF WE NEED TO RUN MAP SYNC
-                // Only if it's NEW and it's a Map-compatible type
-                if (isNew && (activityType === 'bike' || activityType === 'run')) {
-                    newMapActivities++;
+                // <--- 3. MAP CHECK LOGIC --->
+                // If it's a Bike/Run, we check if we have the map.
+                if (activityType === 'bike' || activityType === 'run') {
+                    // Check our local cache file
+                    const hasMap = mapCache[externalId];
+
+                    if (isNew) {
+                        console.log(`✨ New Activity detected (${activityType} - ${act.start_date_local}). Queueing Map Sync.`);
+                        pendingMapSync = true;
+                    }
+                    else if (!hasMap) {
+                        console.log(`⚠️  Existing Activity (${externalId}) missing from map cache. Queueing Map Sync.`);
+                        pendingMapSync = true;
+                    }
                 }
 
                 const payload = {
@@ -205,22 +225,21 @@ const run = async () => {
             await batch.commit();
             console.log(`✅ Sync Complete. Updated/Created ${opCount} records.`);
         } else {
-            console.log("✅ No new data to sync.");
+            console.log("✅ No new metadata to sync.");
         }
 
-        // <--- 4. TRIGGER MAP SYNC IF NEEDED
-        if (newMapActivities > 0) {
-            console.log(`\n🗺️ Detected ${newMapActivities} new Run/Bike activities.`);
-            console.log("🔄 Triggering Map Sync...");
+        // <--- 4. TRIGGER MAP SYNC IF REQUIRED --->
+        if (pendingMapSync) {
+            console.log(`\n🗺️  Map updates required.`);
+            console.log("🔄 Triggering scripts/map-sync.js...");
             try {
-                // This runs your other script automatically
+                // Execute the map script
                 execSync('node scripts/map-sync.js', { stdio: 'inherit' });
             } catch (err) {
-                console.error("❌ Map Sync encountered an error (check logs above).");
-                // We don't exit(1) here because the main data sync was successful
+                console.error("❌ Map Sync encountered an error.");
             }
         } else {
-            console.log("⏩ Skipping Map Sync (No new compatible activities).");
+            console.log("⏩ All maps accounted for. Skipping map sync.");
         }
 
         process.exit(0);
