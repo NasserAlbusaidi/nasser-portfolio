@@ -152,7 +152,7 @@ const run = async () => {
         const activitiesDateStart = '2025-11-20';
 
         const activities = await fetchIntervals(`/activities?oldest=${activitiesDateStart}&limit=200`);
-        const ALLOWED = ['Ride', 'Run', 'Swim', 'WeightTraining'];
+        const ALLOWED = ['Ride', 'Run', 'Swim', 'OpenWaterSwim', 'WeightTraining'];
 
         if (Array.isArray(activities)) {
             activities.forEach(act => {
@@ -174,12 +174,12 @@ const run = async () => {
 
                 let activityType = 'run';
                 if (act.type === 'Ride') activityType = 'bike';
-                if (act.type === 'Swim') activityType = 'swim';
+                if (act.type === 'Swim' || act.type === 'OpenWaterSwim') activityType = 'swim';
                 if (act.type === 'WeightTraining') activityType = 'workout';
 
                 // <--- 3. MAP CHECK LOGIC --->
-                // If it's a Bike/Run, we check if we have the map.
-                if (activityType === 'bike' || activityType === 'run') {
+                // If it's a Bike/Run/OpenWaterSwim, we check if we have the map.
+                if (activityType === 'bike' || activityType === 'run' || (act.type === 'OpenWaterSwim')) {
                     // Check our local cache file
                     const hasMap = mapCache[externalId];
 

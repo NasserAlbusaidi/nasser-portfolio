@@ -85,7 +85,7 @@ const run = async () => {
     logs.forEach(doc => {
         const data = doc.data();
         const rawId = data.externalId || data.id; // Handle both formats
-        if (rawId && (data.activityType === 'bike' || data.activityType === 'run')) {
+        if (rawId && (data.activityType === 'bike' || data.activityType === 'run' || data.activityType === 'swim')) {
             dbActivities.push({ id: String(rawId), type: data.activityType });
         }
     });
