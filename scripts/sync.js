@@ -148,10 +148,10 @@ const run = async () => {
         });
         console.log(`📂 Found ${existingLogsMap.size} existing logs in database.`);
 
-        // <--- 2. FIXED DATE: Start from Nov 20, 2025 to catch "yesterday's run" --->
+        // <--- 2. TRAINING START DATE: Nov 20, 2025 --->
         const activitiesDateStart = '2025-11-20';
 
-        const activities = await fetchIntervals(`/activities?oldest=${activitiesDateStart}&limit=50`);
+        const activities = await fetchIntervals(`/activities?oldest=${activitiesDateStart}&limit=200`);
         const ALLOWED = ['Ride', 'Run', 'Swim', 'WeightTraining'];
 
         if (Array.isArray(activities)) {
@@ -228,10 +228,10 @@ const run = async () => {
             console.log("✅ No new metadata to sync.");
         }
 
-        // <--- 4. TRIGGER MAP SYNC IF REQUIRED --->
+        // <--- 4. LOG MAP SYNC STATUS (workflow runs map-sync.js separately) --->
         if (pendingMapSync) {
             console.log(`\n🗺️  Map updates required.`);
-            console.log("🔄 Triggering scripts/map-sync.js...");
+            console.log("📌 The workflow will run map-sync.js next to fetch the maps.");
             try {
                 // Execute the map script
                 execSync('node scripts/map-sync.js', { stdio: 'inherit' });
