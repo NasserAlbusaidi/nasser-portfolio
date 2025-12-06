@@ -6,6 +6,7 @@ import HolographicGauge from '../HolographicGauge';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../App';
 import { useNotification } from '../../contexts/NotificationContext';
+import TrainingVolume from '../analytics/TrainingVolume';
 
 const IRONMAN_DATE = new Date(import.meta.env.VITE_IRONMAN_DATE);
 const TARGETS = {
@@ -35,7 +36,7 @@ const RevealOnScroll = ({ children, className = "" }) => {
 export default function Roadmap() {
     const { trainingLogs, isUnlocked, setSelectedLog, setEditingLog, toggleModal, setConfirmationModal } = useStore();
     const { addNotification } = useNotification();
-    
+
     // --- NEW STATE FOR EXPANSION ---
     const [isExpanded, setIsExpanded] = useState(false);
     const INITIAL_LIMIT = 7;
@@ -77,7 +78,7 @@ export default function Roadmap() {
 
     return (
         <section id="roadmap" className="py-24 px-4 md:px-6 border-t border-neutral-800 min-h-screen bg-[#0a0a0a]">
-            
+
             {/* Header Section */}
             <div className="flex flex-col lg:flex-row items-center lg:items-end justify-between gap-8 mb-16">
                 <div className="text-center lg:text-left">
@@ -94,6 +95,11 @@ export default function Roadmap() {
                 <Countdown targetDate={IRONMAN_DATE} />
             </div>
 
+            {/* Weekly Volume Tracker */}
+            <div className="mb-12">
+                <TrainingVolume trainingLogs={trainingLogs} />
+            </div>
+
             {/* Gauges Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8 mb-24">
                 <HolographicGauge value={totals.swim} max={TARGETS.swim} label="SWIM PROTOCOL" unit="KM" color="#3B82F6" />
@@ -107,7 +113,7 @@ export default function Roadmap() {
                 {/* Timeline Vertical Line */}
                 <div className="absolute left-6 md:left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-neutral-800 to-transparent transform md:-translate-x-1/2"></div>
                 <div className="absolute left-6 md:left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-orange-600 to-transparent transform md:-translate-x-1/2 opacity-20 animate-pulse"></div>
-                
+
                 {/* Goal Flag (Layout Fixed) */}
                 <div className="relative flex flex-row md:flex-col items-center md:justify-center mb-16 pl-16 md:pl-0">
                     <div className="absolute left-6 md:static transform -translate-x-1/2 md:translate-x-0 w-8 h-8 bg-orange-600 flex items-center justify-center z-10 shadow-[0_0_20px_rgba(234,88,12,0.5)] border border-orange-400">
@@ -127,15 +133,15 @@ export default function Roadmap() {
 
                     return (
                         <RevealOnScroll key={log.id} className={`relative flex flex-col md:flex-row items-start md:items-center mb-12 ${isLeft ? 'md:flex-row-reverse' : ''}`}>
-                            
+
                             <div className="absolute left-6 md:left-1/2 w-3 h-3 bg-[#0a0a0a] border border-neutral-600 z-10 transform -translate-x-1.5 md:-translate-x-1.5 mt-6 md:mt-0 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.1)] group-hover:border-white transition-colors">
                                 <div className={`w-1.5 h-1.5 rounded-full absolute top-0.5 left-0.5 ${markerColor} opacity-80`}></div>
                             </div>
 
                             <div className="hidden md:block w-1/2"></div>
 
-                            <div 
-                                onClick={() => setSelectedLog(log)} 
+                            <div
+                                onClick={() => setSelectedLog(log)}
                                 className={`w-full md:w-[45%] pl-16 md:pl-0 ${isLeft ? 'md:pr-12 text-left md:text-right' : 'md:pl-12 text-left'}`}
                             >
                                 <div className={`inline-flex items-center gap-2 mb-3 text-[10px] font-bold uppercase tracking-widest font-mono ${colorClass} ${isLeft ? 'md:flex-row-reverse' : ''}`}>
@@ -145,7 +151,7 @@ export default function Roadmap() {
 
                                 <div className="bg-[#080808] border border-neutral-800 p-5 hover:border-orange-500/50 transition-all group relative overflow-hidden cursor-pointer hover:shadow-[0_0_30px_rgba(255,95,0,0.1)]">
                                     <div className="scanline-sweep"></div>
-                                    
+
                                     {isUnlocked && (
                                         <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                                             <button onClick={(e) => { e.stopPropagation(); handleEdit(log); }} className="text-neutral-600 hover:text-white p-1"><Pencil className="w-3 h-3" /></button>
@@ -154,17 +160,17 @@ export default function Roadmap() {
                                     )}
 
                                     <div className="text-[9px] text-neutral-600 font-mono mb-3 tracking-widest">ID: {log.id.slice(0, 8).toUpperCase()}</div>
-                                    
+
                                     {log.url && (
                                         <div className="mb-4 overflow-hidden aspect-video border border-neutral-900 relative">
                                             <img src={log.url} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0" alt="Log" />
                                         </div>
                                     )}
-                                    
+
                                     <p className="text-neutral-400 text-xs leading-relaxed mb-4 font-mono line-clamp-3 group-hover:text-neutral-200 transition-colors">
                                         "{log.description}"
                                     </p>
-                                    
+
                                     <div className={`text-[9px] text-neutral-500 uppercase tracking-widest flex gap-4 font-mono border-t border-neutral-900 pt-3 ${isLeft ? 'md:justify-end' : ''}`}>
                                         <span>{log.date}</span>
                                         {log.duration && <span className="text-white">{log.duration} MIN</span>}
@@ -178,7 +184,7 @@ export default function Roadmap() {
                 {/* EXPAND BUTTON / END MARKER */}
                 <div className="relative flex flex-col items-center justify-center mt-12 pl-12 md:pl-0 z-20">
                     {trainingLogs.length > INITIAL_LIMIT && (
-                        <button 
+                        <button
                             onClick={() => setIsExpanded(!isExpanded)}
                             className="group flex flex-col items-center gap-3 text-neutral-500 hover:text-orange-500 transition-colors mb-8"
                         >
@@ -198,7 +204,7 @@ export default function Roadmap() {
                             </div>
                         </button>
                     )}
-                    
+
                     {/* Final Dot */}
                     <div className="w-2 h-2 rounded-full bg-neutral-800 z-10 absolute bottom-0 left-6 md:left-1/2 transform -translate-x-1"></div>
                 </div>
