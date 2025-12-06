@@ -103,6 +103,18 @@ export default function GlobalOps() {
                                     'line-blur': 1
                                 }}
                             />
+                            {/* Swim Layer (Cyan/Blue) */}
+                            <Layer
+                                id="swim-layer"
+                                type="line"
+                                filter={['==', 'type', 'swim']}
+                                paint={{
+                                    'line-color': '#00BFFF',
+                                    'line-width': 2,
+                                    'line-opacity': 0.8,
+                                    'line-blur': 1
+                                }}
+                            />
                         </Source>
                     )}
                 </Map>
@@ -116,6 +128,7 @@ export default function GlobalOps() {
                     <div className="space-y-1 font-mono text-xs">
                         <div className="flex gap-2"><div className="w-2 h-2 bg-neon-orange mt-1"></div> <span>BIKE VECTORS</span></div>
                         <div className="flex gap-2"><div className="w-2 h-2 bg-neon-green mt-1"></div> <span>RUN VECTORS</span></div>
+                        <div className="flex gap-2"><div className="w-2 h-2 bg-[#00BFFF] mt-1"></div> <span>SWIM VECTORS</span></div>
                     </div>
                 </div>
 

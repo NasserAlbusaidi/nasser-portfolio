@@ -13,8 +13,8 @@ const LogBlueprintModal = ({ log, onClose, athleteId, apiKey, mapboxToken }) => 
     setLoadingMap(true);
 
     const loadMapData = async () => {
-      // Only fetch map data for run and bike activities
-      if (log.activityType === 'run' || log.activityType === 'bike') {
+      // Only fetch map data for run, bike, and swim (outdoor) activities
+      if (log.activityType === 'run' || log.activityType === 'bike' || log.activityType === 'swim') {
         try {
           const data = await fetchActivityMap(log.externalId, athleteId, apiKey);
           setMapData(data);
@@ -51,11 +51,11 @@ const LogBlueprintModal = ({ log, onClose, athleteId, apiKey, mapboxToken }) => 
             <img src={log.url} className="max-h-full max-w-full object-contain" alt="Activity Log" />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center text-neutral-700 border border-dashed border-neutral-800">
-                <Map className="w-24 h-24 mb-4"/>
-                <span className="text-sm tracking-widest uppercase">NO VISUALS ATTACHED</span>
+              <Map className="w-24 h-24 mb-4" />
+              <span className="text-sm tracking-widest uppercase">NO VISUALS ATTACHED</span>
             </div>
           )}
-           <div className="absolute top-4 left-4 text-[10px] text-neon-green font-mono tracking-widest bg-black px-2 py-1 border border-neon-green/30">LOG_ID: {log.id.slice(0, 8).toUpperCase()}</div>
+          <div className="absolute top-4 left-4 text-[10px] text-neon-green font-mono tracking-widest bg-black px-2 py-1 border border-neon-green/30">LOG_ID: {log.id.slice(0, 8).toUpperCase()}</div>
         </div>
 
         {/* Right: Specs Panel */}
@@ -75,11 +75,11 @@ const LogBlueprintModal = ({ log, onClose, athleteId, apiKey, mapboxToken }) => 
 
             <div className="grid grid-cols-2 gap-8">
               <div>
-                <label className="text-[10px] text-neutral-600 uppercase tracking-widest block mb-2 flex items-center gap-2"><TrendingUp className="w-3 h-3"/>Distance</label>
+                <label className="text-[10px] text-neutral-600 uppercase tracking-widest block mb-2 flex items-center gap-2"><TrendingUp className="w-3 h-3" />Distance</label>
                 <div className="text-lg font-bold text-white">{log.distance || 'N/A'} <span className="text-sm text-neutral-500">km</span></div>
               </div>
               <div>
-                <label className="text-[10px] text-neutral-600 uppercase tracking-widest block mb-2 flex items-center gap-2"><Clock className="w-3 h-3"/>Duration</label>
+                <label className="text-[10px] text-neutral-600 uppercase tracking-widest block mb-2 flex items-center gap-2"><Clock className="w-3 h-3" />Duration</label>
                 <div className="text-lg font-bold text-white">{log.duration || 'N/A'} <span className="text-sm text-neutral-500">min</span></div>
               </div>
             </div>
@@ -88,18 +88,18 @@ const LogBlueprintModal = ({ log, onClose, athleteId, apiKey, mapboxToken }) => 
               <label className="text-[10px] text-neutral-600 uppercase tracking-widest block mb-2">Biometric Data</label>
               <Biometrics log={log} />
             </div>
-            
+
             <div>
-                <label className="text-[10px] text-neutral-600 uppercase tracking-widest block mb-2">GPS Trace</label>
-                <div className="aspect-video bg-[#080808] border border-neutral-900 p-2 flex items-center justify-center text-center relative overflow-hidden">
-                    {loadingMap ? (
-                        <span className="text-neutral-500 text-xs animate-pulse">RETRIEVING MAP DATA...</span>
-                    ) : mapData && mapData.latlngs && mapData.latlngs.length > 0 ? (
-                        <MapDisplay mapData={mapData} mapboxToken={mapboxToken} />
-                    ) : (
-                        <span className="text-neutral-700 text-xs">[ No map data available ]</span>
-                    )}
-                </div>
+              <label className="text-[10px] text-neutral-600 uppercase tracking-widest block mb-2">GPS Trace</label>
+              <div className="aspect-video bg-[#080808] border border-neutral-900 p-2 flex items-center justify-center text-center relative overflow-hidden">
+                {loadingMap ? (
+                  <span className="text-neutral-500 text-xs animate-pulse">RETRIEVING MAP DATA...</span>
+                ) : mapData && mapData.latlngs && mapData.latlngs.length > 0 ? (
+                  <MapDisplay mapData={mapData} mapboxToken={mapboxToken} />
+                ) : (
+                  <span className="text-neutral-700 text-xs">[ No map data available ]</span>
+                )}
+              </div>
             </div>
 
           </div>
@@ -222,13 +222,13 @@ const Biometrics = ({ log }) => {
   const renderMetric = (label, value, unit = '') => {
     // Don't render the row if the value is null or undefined
     if (value === null || typeof value === 'undefined') {
-        return null;
+      return null;
     }
     return (
-        <div key={label} className="flex justify-between border-b border-neutral-900 last:border-b-0 pb-2 last:pb-0">
-            <span>{label}</span>
-            <span className="text-white">{value} <span className="text-neutral-500">{unit}</span></span>
-        </div>
+      <div key={label} className="flex justify-between border-b border-neutral-900 last:border-b-0 pb-2 last:pb-0">
+        <span>{label}</span>
+        <span className="text-white">{value} <span className="text-neutral-500">{unit}</span></span>
+      </div>
     );
   }
 
@@ -277,7 +277,7 @@ const Biometrics = ({ log }) => {
       </div>
     );
   }
-  
+
   return (
     <div className={metricBox}>
       {activityMetrics}
