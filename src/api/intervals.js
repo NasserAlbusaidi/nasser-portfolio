@@ -58,14 +58,14 @@ export const fetchWellness = async (athleteId, apiKey, afterDate) => {
  * @returns {Array}
  */
 export const processActivities = (activities) => {
-  const ALLOWED_TYPES = ['Ride', 'Run', 'Swim', 'WeightTraining'];
+  const ALLOWED_TYPES = ['Ride', 'Run', 'Swim', 'OpenWaterSwim', 'WeightTraining'];
 
   return activities
     .filter(activity => ALLOWED_TYPES.includes(activity.type))
     .map(activity => {
       let activityType = 'run';
       if (activity.type === 'Ride') activityType = 'bike';
-      if (activity.type === 'Swim') activityType = 'swim';
+      if (activity.type === 'Swim' || activity.type === 'OpenWaterSwim') activityType = 'swim';
       if (activity.type === 'WeightTraining') activityType = 'workout';
 
       const distanceKm = (activity.distance / 1000).toFixed(2);
