@@ -91,6 +91,8 @@ const run = async () => {
     });
 
     console.log(`📂 Database holds ${dbActivities.length} mappable missions.`);
+    console.log(`   IDs in DB: [${dbActivities.map(a => a.id).join(', ')}]`);
+    console.log(`   IDs in Cache: [${Object.keys(cache).join(', ')}]`);
 
     // 3. "Deep Check" - Find Missing Plots
     // Logic: If it's in the DB but NOT in the cache, we must fetch it.
