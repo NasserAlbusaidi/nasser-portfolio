@@ -249,3 +249,113 @@ body::after {
 .font-orbitron {
   font-family: 'Orbitron', sans-serif;
 }
+
+/* --- HOLOGRAPHIC EFFECTS --- */
+
+/* Chromatic Aberration Text */
+.chromatic-text {
+  text-shadow:
+    -1px 0 #ff0000,
+    1px 0 #00ffff,
+    0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+/* Holographic Scanline Overlay */
+.holographic-scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(transparent 0 2px,
+      rgba(255, 255, 255, 0.02) 2px 3px);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Holographic Flicker Animation */
+@keyframes holoFlicker {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  25% {
+    opacity: 0.97;
+  }
+
+  50% {
+    opacity: 0.92;
+  }
+
+  75% {
+    opacity: 0.98;
+  }
+}
+
+.holographic-gauge {
+  animation: holoFlicker 4s ease-in-out infinite;
+}
+
+/* --- BIOMONITOR EFFECTS --- */
+
+/* EKG Heartbeat Animation */
+@keyframes ekgPulse {
+  0% {
+    stroke-dashoffset: 100;
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.ekg-line {
+  stroke-dasharray: 100;
+  animation: ekgPulse 1.2s linear infinite;
+}
+
+/* Telemetry Ticker Scroll */
+@keyframes tickerScroll {
+  0% {
+    transform: translateX(100%);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.telemetry-ticker {
+  animation: tickerScroll 25s linear infinite;
+}
+
+.telemetry-ticker:hover {
+  animation-play-state: paused;
+}
+
+/* Zone Glow Indicators */
+.zone-glow-red {
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.25), inset 0 0 20px rgba(239, 68, 68, 0.05);
+  border-color: rgba(239, 68, 68, 0.4) !important;
+}
+
+.zone-glow-cyan {
+  box-shadow: 0 0 30px rgba(6, 182, 212, 0.25), inset 0 0 20px rgba(6, 182, 212, 0.05);
+  border-color: rgba(6, 182, 212, 0.4) !important;
+}
+
+/* Target Acquisition Animation */
+@keyframes targetLock {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(255, 95, 0, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 95, 0, 0.5), 0 0 20px rgba(255, 95, 0, 0.3);
+  }
+}
+
+.target-acquired {
+  animation: targetLock 1s ease-in-out infinite;
+}
