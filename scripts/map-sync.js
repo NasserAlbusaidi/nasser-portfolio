@@ -151,9 +151,10 @@ const run = async () => {
     const geoJSON = { type: "FeatureCollection", features: features };
 
     // 5. Write to Firestore (single document)
+    // Store as stringified JSON to avoid Firestore's nested entity limits
     console.log("🔥 Uploading to Firestore...");
     await db.collection('mission_data').doc('paths').set({
-        geoJSON: geoJSON,
+        geoJSONString: JSON.stringify(geoJSON),
         totalPaths: features.length,
         totalPoints: totalPoints,
         updatedAt: new Date()
