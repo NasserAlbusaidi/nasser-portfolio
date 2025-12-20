@@ -18,7 +18,6 @@ export default function GlobalOps() {
     });
     const [mapData, setMapData] = useState(null);
     const [selectedActivity, setSelectedActivity] = useState(null);
-    const [isRotating, setIsRotating] = useState(true);
     const mapRef = useRef();
 
     // Load the GeoJSON from Firestore
@@ -30,30 +29,36 @@ export default function GlobalOps() {
 
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    setMapData(data.geoJSON);
+                    // Parse the stringified GeoJSON
+                    const geoJSON = JSON.parse(data.geoJSONString);
+                    setMapData(geoJSON);
                     console.log(`🗺️ Map Loaded from Firestore: ${data.totalPaths} paths`);
                 } else {
-                    console.warn("Map data not found in Firestore");
+                    console.warn("Map data not found in Firestore, trying static file...");
+                    // Fallback to static file
+                    const res = await fetch(`/mission_paths.json?t=${Date.now()}`);
+                    const staticData = await res.json();
+                    setMapData(staticData);
+                    console.log(`🗺️ Map Loaded from static file: ${staticData.features?.length} paths`);
                 }
             } catch (err) {
                 console.error("Firestore Map Fetch Error:", err);
+                // Fallback to static file on error
+                try {
+                    const res = await fetch(`/mission_paths.json?t=${Date.now()}`);
+                    const staticData = await res.json();
+                    setMapData(staticData);
+                    console.log(`🗺️ Map Loaded from static fallback: ${staticData.features?.length} paths`);
+                } catch (fallbackErr) {
+                    console.error("Static file fallback also failed:", fallbackErr);
+                }
             }
         };
 
         fetchMapData();
     }, []);
 
-    // Rotate the globe slowly (only when not interacting)
-    useEffect(() => {
-        if (!mapRef.current || !isRotating) return;
-        const interval = setInterval(() => {
-            setViewState(v => ({
-                ...v,
-                longitude: v.longitude + 0.1 // Slow spin
-            }));
-        }, 50);
-        return () => clearInterval(interval);
-    }, [isRotating]);
+
 
     // Get activity list from GeoJSON features
     const activityList = useMemo(() => {
@@ -73,7 +78,6 @@ export default function GlobalOps() {
     // FlyTo target acquisition
     const handleActivitySelect = (activity) => {
         setSelectedActivity(activity.id);
-        setIsRotating(false);
 
         if (mapRef.current) {
             const coords = activity.coordinates;
@@ -86,8 +90,6 @@ export default function GlobalOps() {
             });
         }
 
-        // Resume rotation after 10 seconds
-        setTimeout(() => setIsRotating(true), 10000);
     };
 
     const getActivityIcon = (type) => {
@@ -162,11 +164,6 @@ export default function GlobalOps() {
                         {...viewState}
                         onMove={evt => {
                             setViewState(evt.viewState);
-                            setIsRotating(false);
-                        }}
-                        onMoveEnd={() => {
-                            // Resume rotation after 5 seconds of inactivity
-                            setTimeout(() => setIsRotating(true), 5000);
                         }}
                         ref={mapRef}
                         mapStyle="mapbox://styles/mapbox/dark-v11"
@@ -226,9 +223,7 @@ export default function GlobalOps() {
                         <div className="flex items-center gap-2 mb-2">
                             <Terminal className="w-3 h-3 text-neutral-500" />
                             <span className="text-[10px] text-neutral-400 tracking-widest">LIVE_TELEMETRY</span>
-                            {!isRotating && (
-                                <span className="text-[9px] text-neon-orange ml-2 animate-pulse">MANUAL</span>
-                            )}
+
                         </div>
                         <div className="space-y-1 font-mono text-xs">
                             <div className="flex gap-2"><div className="w-2 h-2 bg-neon-orange mt-1"></div> <span>BIKE VECTORS</span></div>
