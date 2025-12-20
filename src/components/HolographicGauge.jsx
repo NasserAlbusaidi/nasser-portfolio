@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 
 const HolographicGauge = ({ value, max, label, color = '#00FF41', unit = '' }) => {
     const [animatedValue, setAnimatedValue] = useState(0);
@@ -30,7 +31,19 @@ const HolographicGauge = ({ value, max, label, color = '#00FF41', unit = '' }) =
     const strokeDashoffset = circumference - (animatedValue / max) * circumference;
 
     return (
-        <div className="relative flex flex-col items-center justify-center p-4 group">
+        <motion.div
+            className="relative flex flex-col items-center justify-center p-4 group holographic-gauge"
+            whileHover={{
+                rotateX: 10,
+                rotateY: -10,
+                scale: 1.05,
+                transition: { duration: 0.3 }
+            }}
+            style={{ perspective: 1000, transformStyle: 'preserve-3d' }}
+        >
+            {/* Holographic Scanline Overlay */}
+            <div className="holographic-scanlines"></div>
+
             {/* Holographic Container Glow */}
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[rgba(255,255,255,0.02)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
 
@@ -70,9 +83,9 @@ const HolographicGauge = ({ value, max, label, color = '#00FF41', unit = '' }) =
                     />
                 </svg>
 
-                {/* Center Text */}
+                {/* Center Text with Chromatic Aberration */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-2xl font-bold font-mono text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
+                    <span className="text-2xl font-bold font-mono text-white chromatic-text">
                         {Math.round(animatedValue)}
                     </span>
                     <span className="text-[10px] uppercase tracking-widest text-neutral-500 font-mono">
@@ -89,8 +102,9 @@ const HolographicGauge = ({ value, max, label, color = '#00FF41', unit = '' }) =
             {/* Decorative Glitch Elements */}
             <div className="absolute top-0 left-1/2 w-px h-4 bg-neutral-800"></div>
             <div className="absolute bottom-0 left-1/2 w-px h-4 bg-neutral-800"></div>
-        </div>
+        </motion.div>
     );
 };
 
 export default HolographicGauge;
+

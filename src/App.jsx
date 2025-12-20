@@ -10,6 +10,7 @@ import LogBlueprintModal from './components/system/LogBlueprintModal';
 import ParticleBackground from './components/effects/ParticleBackground';
 
 import Navigation from './components/ui/Navigation';
+import TacticalHUD from './components/TacticalHUD';
 import Garage from './components/sections/Garage';
 import Roadmap from './components/sections/Roadmap';
 import Analytics from './components/sections/Analytics';
@@ -106,9 +107,10 @@ export default function App() {
       {isBooting && <BootSequence onComplete={() => setIsBooting(false)} />}
 
       <Navigation />
+      <TacticalHUD wellnessLogs={wellnessLogs} />
       <PinPadModal />
 
-      <div className="max-w-screen-2xl mx-auto">
+      <div className="max-w-screen-2xl mx-auto pt-10">
         <Garage />
         <Roadmap />
         <Analytics />

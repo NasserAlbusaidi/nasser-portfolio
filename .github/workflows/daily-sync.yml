@@ -31,31 +31,18 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: node scripts/sync.js
 
-      - name: Run Map Sync
+      - name: Run Map Sync (Direct to Firestore)
         env:
           VITE_INTERVALS_API_KEY: ${{ secrets.VITE_INTERVALS_API_KEY }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: node scripts/map-sync.js
 
-      - name: Check for Changes
-        id: git-check
-        run: |
-          git diff --exit-code || echo "changes=true" >> $GITHUB_OUTPUT
-
-      - name: Commit & Push Map Data
-        if: steps.git-check.outputs.changes == 'true'
+      # Cache file is updated locally for API efficiency
+      # No build/deploy needed - map data goes directly to Firestore!
+      - name: Update Map Cache (Git)
         run: |
           git config --global user.name 'Mission Control Bot'
           git config --global user.email 'bot@nasser-os.com'
-          git add public/mission_paths.json scripts/map-cache.json
-          git commit -m "chore: update operational map data"
-          git push
-
-      # 🟢 NEW STEP: Deploy immediately if changes were detected
-      - name: Build and Deploy to Firebase
-        if: steps.git-check.outputs.changes == 'true'
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: |
-          npm run build
-          npx firebase-tools deploy --only hosting --project nasser-portfolio --token "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
+          git add scripts/map-cache.json || true
+          git diff --cached --quiet || git commit -m "chore: update map cache"
+          git push || true

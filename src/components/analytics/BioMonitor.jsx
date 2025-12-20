@@ -1,6 +1,21 @@
-import React from 'react';
-import { Footprints, Heart, Moon, Activity } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Footprints, Heart, Moon, Activity, Terminal } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, ResponsiveContainer, Tooltip, Cell, XAxis, YAxis } from 'recharts';
+
+// EKG Heartbeat SVG Component
+const EKGPulse = () => (
+    <svg width="60" height="20" viewBox="0 0 60 20" className="ml-2">
+        <path
+            d="M0,10 L10,10 L15,10 L18,2 L22,18 L26,5 L30,15 L34,10 L40,10 L45,10 L48,3 L52,17 L56,8 L60,10"
+            fill="none"
+            stroke="#EF4444"
+            strokeWidth="1.5"
+            className="ekg-line"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+    </svg>
+);
 
 const BioMonitor = ({ wellnessData }) => {
     // 1. Safe Sort (Oldest -> Newest)
@@ -25,6 +40,41 @@ const BioMonitor = ({ wellnessData }) => {
         return `${hrs}h ${mins}m`;
     };
 
+    // 5. Zone Glow Logic
+    const getZoneClass = useMemo(() => {
+        const hr = latestEntry.restingHR;
+        const sleep = latestEntry.sleepSecs;
+
+        if (hr && hr > 70) return 'zone-glow-red';
+        if (sleep && sleep > 28800) return 'zone-glow-cyan'; // 8 hours in seconds
+        return '';
+    }, [latestEntry.restingHR, latestEntry.sleepSecs]);
+
+    // 6. Generate Telemetry Log Entries
+    const telemetryLogs = useMemo(() => {
+        const logs = [];
+        const recent = sortedData.slice(-5);
+
+        recent.forEach(entry => {
+            const time = new Date(entry.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+
+            if (entry.steps && entry.steps >= 10000) {
+                logs.push({ time, msg: 'STEPS_TARGET_REACHED', color: 'text-neon-green' });
+            }
+            if (entry.sleepSecs && entry.sleepSecs > 28800) {
+                logs.push({ time, msg: 'SLEEP_OPTIMAL', color: 'text-cyan-400' });
+            }
+            if (entry.hrv && entry.hrv > 50) {
+                logs.push({ time, msg: 'HRV_NOMINAL', color: 'text-emerald-400' });
+            }
+            if (entry.restingHR && entry.restingHR > 70) {
+                logs.push({ time, msg: 'HR_ELEVATED', color: 'text-red-400' });
+            }
+        });
+
+        return logs.slice(-8); // Limit to 8 entries
+    }, [sortedData]);
+
     // Custom Tooltip Component to reuse style
     const BrutalistTooltip = ({ active, payload, label, unit, color }) => {
         if (active && payload && payload.length) {
@@ -48,123 +98,151 @@ const BioMonitor = ({ wellnessData }) => {
     );
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full font-mono">
+        <div className="space-y-4 w-full font-mono">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            {/* 1. CARDIOVASCULAR STATUS */}
-            <div className="bg-[#0a0a0a] border border-neutral-800 p-5 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-20 h-20 bg-red-900/10 blur-2xl rounded-full -mr-10 -mt-10"></div>
+                {/* 1. CARDIOVASCULAR STATUS */}
+                <div className={`bg-[#0a0a0a] border border-neutral-800 p-5 relative overflow-hidden group transition-all duration-500 ${getZoneClass}`}>
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-red-900/10 blur-2xl rounded-full -mr-10 -mt-10"></div>
 
-                <div className="flex justify-between items-start mb-4 relative z-10">
-                    <div>
-                        <div className="flex items-center gap-2 text-red-500 text-[10px] font-bold tracking-widest uppercase mb-1">
-                            <Heart className="w-3 h-3" /> Resting H.R. <span className="text-neutral-600">[{displayDate}]</span>
-                        </div>
-                        <div className="flex items-baseline gap-2">
-                            <div className="text-4xl text-white font-bold tracking-tighter">
-                                {latestEntry.restingHR || "--"}
+                    <div className="flex justify-between items-start mb-4 relative z-10">
+                        <div>
+                            <div className="flex items-center gap-2 text-red-500 text-[10px] font-bold tracking-widest uppercase mb-1">
+                                <Heart className="w-3 h-3 animate-pulse" />
+                                Resting H.R.
+                                <EKGPulse />
+                                <span className="text-neutral-600">[{displayDate}]</span>
                             </div>
-                            <span className="text-xs text-neutral-500 font-bold">BPM</span>
+                            <div className="flex items-baseline gap-2">
+                                <div className="text-4xl text-white font-bold tracking-tighter chromatic-text">
+                                    {latestEntry.restingHR || "--"}
+                                </div>
+                                <span className="text-xs text-neutral-500 font-bold">BPM</span>
+                            </div>
                         </div>
+                        {latestEntry.hrv && (
+                            <div className="text-right">
+                                <div className="text-[9px] text-neutral-500 uppercase tracking-widest mb-1">HRV (rMSSD)</div>
+                                <div className="text-xl text-neutral-300">{latestEntry.hrv} <span className="text-[10px] text-neutral-600">ms</span></div>
+                            </div>
+                        )}
                     </div>
-                    {latestEntry.hrv && (
+
+                    {/* RHR Area Chart */}
+                    <div className="h-24 w-full opacity-80 group-hover:opacity-100 transition-opacity">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={recentData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="colorHr" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <XAxis
+                                    dataKey="date"
+                                    tickFormatter={(str) => new Date(str).toLocaleDateString('en-US', { day: 'numeric' })}
+                                    tick={{ fill: '#444', fontSize: 9, fontFamily: 'monospace' }}
+                                    axisLine={false}
+                                    tickLine={false}
+                                    interval="preserveStartEnd"
+                                    minTickGap={10}
+                                />
+                                <YAxis
+                                    domain={['dataMin - 2', 'dataMax + 2']}
+                                    hide={true}
+                                />
+                                <Tooltip
+                                    content={<BrutalistTooltip unit="BPM" color="#EF4444" />}
+                                    cursor={{ stroke: '#333', strokeWidth: 1, strokeDasharray: '2 2' }}
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="restingHR"
+                                    stroke="#EF4444"
+                                    strokeWidth={2}
+                                    fillOpacity={1}
+                                    fill="url(#colorHr)"
+                                    isAnimationActive={true}
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* 2. ACTIVITY & RECOVERY */}
+                <div className="bg-[#0a0a0a] border border-neutral-800 p-5 relative overflow-hidden flex flex-col justify-between">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-blue-900/10 blur-2xl rounded-full -mr-10 -mt-10"></div>
+
+                    <div className="flex justify-between items-start mb-2 relative z-10">
+                        <div>
+                            <div className="flex items-center gap-2 text-blue-500 text-[10px] font-bold tracking-widest uppercase mb-1">
+                                <Footprints className="w-3 h-3" /> Step Volume <span className={isToday ? "text-neon-green" : "text-neutral-500"}>[{displayDate}]</span>
+                            </div>
+                            <div className="text-2xl text-white font-bold tracking-tighter">
+                                {latestEntry.steps ? latestEntry.steps.toLocaleString() : "--"}
+                            </div>
+                        </div>
                         <div className="text-right">
-                            <div className="text-[9px] text-neutral-500 uppercase tracking-widest mb-1">HRV (rMSSD)</div>
-                            <div className="text-xl text-neutral-300">{latestEntry.hrv} <span className="text-[10px] text-neutral-600">ms</span></div>
+                            <div className="flex items-center justify-end gap-2 text-purple-500 text-[10px] font-bold tracking-widest uppercase mb-1">
+                                <Moon className="w-3 h-3" /> Last Sleep
+                            </div>
+                            <div className="text-xl text-neutral-300">{formatSleep(latestEntry.sleepSecs)}</div>
                         </div>
-                    )}
-                </div>
+                    </div>
 
-                {/* RHR Area Chart */}
-                <div className="h-24 w-full opacity-80 group-hover:opacity-100 transition-opacity">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={recentData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="colorHr" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <XAxis
-                                dataKey="date"
-                                tickFormatter={(str) => new Date(str).toLocaleDateString('en-US', { day: 'numeric' })}
-                                tick={{ fill: '#444', fontSize: 9, fontFamily: 'monospace' }}
-                                axisLine={false}
-                                tickLine={false}
-                                interval="preserveStartEnd"
-                                minTickGap={10}
-                            />
-                            <YAxis
-                                domain={['dataMin - 2', 'dataMax + 2']}
-                                hide={true}
-                            />
-                            <Tooltip
-                                content={<BrutalistTooltip unit="BPM" color="#EF4444" />}
-                                cursor={{ stroke: '#333', strokeWidth: 1, strokeDasharray: '2 2' }}
-                            />
-                            <Area
-                                type="monotone"
-                                dataKey="restingHR"
-                                stroke="#EF4444"
-                                strokeWidth={2}
-                                fillOpacity={1}
-                                fill="url(#colorHr)"
-                                isAnimationActive={true}
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
+                    {/* Steps Bar Chart */}
+                    <div className="h-24 w-full mt-2">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={last5Days} barCategoryGap="20%">
+                                <XAxis
+                                    dataKey="date"
+                                    tickFormatter={(str) => new Date(str).toLocaleDateString('en-US', { weekday: 'narrow' })}
+                                    tick={{ fill: '#444', fontSize: 9, fontFamily: 'monospace' }}
+                                    axisLine={false}
+                                    tickLine={false}
+                                    interval={0}
+                                />
+                                <Tooltip
+                                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                    content={<BrutalistTooltip unit="STEPS" color="#3B82F6" />}
+                                />
+                                <Bar dataKey="steps" radius={[2, 2, 0, 0]} isAnimationActive={true}>
+                                    {last5Days.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={index === last5Days.length - 1 ? '#3B82F6' : '#1e293b'}
+                                            className="transition-all hover:opacity-80"
+                                        />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
             </div>
 
-            {/* 2. ACTIVITY & RECOVERY */}
-            <div className="bg-[#0a0a0a] border border-neutral-800 p-5 relative overflow-hidden flex flex-col justify-between">
-                <div className="absolute top-0 right-0 w-20 h-20 bg-blue-900/10 blur-2xl rounded-full -mr-10 -mt-10"></div>
+            {/* TELEMETRY TICKER */}
+            {telemetryLogs.length > 0 && (
+                <div className="bg-[#0a0a0a] border border-neutral-800 p-2 overflow-hidden relative">
+                    <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0a0a0a] to-transparent z-10 pointer-events-none"></div>
+                    <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0a0a0a] to-transparent z-10 pointer-events-none"></div>
 
-                <div className="flex justify-between items-start mb-2 relative z-10">
-                    <div>
-                        <div className="flex items-center gap-2 text-blue-500 text-[10px] font-bold tracking-widest uppercase mb-1">
-                            <Footprints className="w-3 h-3" /> Step Volume <span className={isToday ? "text-neon-green" : "text-neutral-500"}>[{displayDate}]</span>
-                        </div>
-                        <div className="text-2xl text-white font-bold tracking-tighter">
-                            {latestEntry.steps ? latestEntry.steps.toLocaleString() : "--"}
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <div className="flex items-center justify-end gap-2 text-purple-500 text-[10px] font-bold tracking-widest uppercase mb-1">
-                            <Moon className="w-3 h-3" /> Last Sleep
-                        </div>
-                        <div className="text-xl text-neutral-300">{formatSleep(latestEntry.sleepSecs)}</div>
-                    </div>
-                </div>
-
-                {/* Steps Bar Chart */}
-                <div className="h-24 w-full mt-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={last5Days} barCategoryGap="20%">
-                            <XAxis
-                                dataKey="date"
-                                tickFormatter={(str) => new Date(str).toLocaleDateString('en-US', { weekday: 'narrow' })}
-                                tick={{ fill: '#444', fontSize: 9, fontFamily: 'monospace' }}
-                                axisLine={false}
-                                tickLine={false}
-                                interval={0}
-                            />
-                            <Tooltip
-                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                content={<BrutalistTooltip unit="STEPS" color="#3B82F6" />}
-                            />
-                            <Bar dataKey="steps" radius={[2, 2, 0, 0]} isAnimationActive={true}>
-                                {last5Days.map((entry, index) => (
-                                    <Cell
-                                        key={`cell-${index}`}
-                                        fill={index === last5Days.length - 1 ? '#3B82F6' : '#1e293b'}
-                                        className="transition-all hover:opacity-80"
-                                    />
+                    <div className="flex items-center gap-2">
+                        <Terminal className="w-3 h-3 text-neutral-600 flex-shrink-0" />
+                        <div className="overflow-hidden flex-1">
+                            <div className="telemetry-ticker whitespace-nowrap flex gap-6 text-[10px] tracking-wider">
+                                {telemetryLogs.concat(telemetryLogs).map((log, i) => (
+                                    <span key={i} className="inline-flex gap-2">
+                                        <span className="text-neutral-600">[{log.time}]</span>
+                                        <span className={log.color}>{log.msg}</span>
+                                        <span className="text-neutral-800">•</span>
+                                    </span>
                                 ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };

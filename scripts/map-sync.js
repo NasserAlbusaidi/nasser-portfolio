@@ -4,7 +4,6 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 // --- CONFIG ---
-const OUTPUT_FILE = './public/mission_paths.json';
 const CACHE_FILE = './scripts/map-cache.json';
 const API_KEY = process.env.VITE_INTERVALS_API_KEY;
 
@@ -70,6 +69,7 @@ const processCoordinates = (coords) => {
 
 const run = async () => {
     console.log("🌍 GLOBAL OPS: Map Sync Sequence Initiated...");
+    console.log("📡 Mode: FIRESTORE DIRECT (No rebuild required!)");
 
     // 1. Load Cache
     let cache = {};
@@ -95,7 +95,6 @@ const run = async () => {
     console.log(`   IDs in Cache: [${Object.keys(cache).join(', ')}]`);
 
     // 3. "Deep Check" - Find Missing Plots
-    // Logic: If it's in the DB but NOT in the cache, we must fetch it.
     const missingFromCache = dbActivities.filter(act => !cache[act.id]);
 
     if (missingFromCache.length > 0) {
@@ -118,8 +117,6 @@ const run = async () => {
                 }
             } else {
                 console.log(`❌ No Map Found (Indoor?)`);
-                // Optional: Mark as 'no_map' in cache to prevent infinite retries? 
-                // For now, we leave it to retry in case API was just temp down.
             }
 
             // Rate Limit safety
@@ -128,18 +125,17 @@ const run = async () => {
 
         if (fetchedCount > 0) {
             fs.writeFileSync(CACHE_FILE, JSON.stringify(cache));
-            console.log(`💾 Cache Updated: +${fetchedCount} new traces.`);
+            console.log(`💾 Local Cache Updated: +${fetchedCount} new traces.`);
         }
     } else {
         console.log("✅ All missions accounted for. Cache is synced.");
     }
 
-    // 4. Rebuild GeoJSON (Always rebuild to ensure file integrity)
-    console.log("🗺️  Re-assembling Global Map Data...");
+    // 4. Build GeoJSON and Write to Firestore
+    console.log("🗺️  Assembling GeoJSON for Firestore...");
     const features = [];
     let totalPoints = 0;
 
-    // Only add activities that are currently in the DB (handles deletions)
     for (const act of dbActivities) {
         const coords = cache[act.id];
         if (coords && coords.length > 0) {
@@ -153,11 +149,20 @@ const run = async () => {
     }
 
     const geoJSON = { type: "FeatureCollection", features: features };
-    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(geoJSON));
+
+    // 5. Write to Firestore (single document)
+    console.log("🔥 Uploading to Firestore...");
+    await db.collection('mission_data').doc('paths').set({
+        geoJSON: geoJSON,
+        totalPaths: features.length,
+        totalPoints: totalPoints,
+        updatedAt: new Date()
+    });
 
     console.log(`🎉 OPERATION COMPLETE.`);
     console.log(`   > Total Paths: ${features.length}`);
-    console.log(`   > Map File:    ${OUTPUT_FILE}`);
+    console.log(`   > Total Points: ${totalPoints}`);
+    console.log(`   > Destination: Firestore (mission_data/paths)`);
 
     process.exit(0);
 };
