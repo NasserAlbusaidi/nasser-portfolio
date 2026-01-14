@@ -158,13 +158,14 @@ export default function GlobalOps() {
                 )}
 
                 {/* The Map Container */}
-                <div className="flex-1 h-[600px] border border-neutral-800 rounded-lg overflow-hidden relative group order-1 lg:order-2">
+                <div className="flex-1 h-[600px] border border-neutral-800 rounded-lg overflow-hidden relative group order-1 lg:order-2 bg-neutral-900">
 
                     <Map
                         {...viewState}
                         onMove={evt => {
                             setViewState(evt.viewState);
                         }}
+                        style={{ width: '100%', height: '100%' }}
                         ref={mapRef}
                         mapStyle="mapbox://styles/mapbox/dark-v11"
                         mapboxAccessToken={MAPBOX_TOKEN}
