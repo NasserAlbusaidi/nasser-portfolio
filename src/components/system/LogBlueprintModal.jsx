@@ -155,11 +155,30 @@ const MapTraceSVG = ({ latlngs, bounds }) => {
     );
   }
 
+  // Validate bounds structure
+  if (!Array.isArray(bounds[0]) || !Array.isArray(bounds[1]) ||
+    bounds[0].length < 2 || bounds[1].length < 2) {
+    return (
+      <svg width="100%" height="100%" viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`} className="bg-black/20">
+        <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle" fill="#555" fontSize="12">INVALID_BOUNDS</text>
+      </svg>
+    );
+  }
+
   // Bounds are [[minLat, minLng], [maxLat, maxLng]]
   const [[minLat, minLng], [maxLat, maxLng]] = bounds;
 
   const latRange = maxLat - minLat;
   const lngRange = maxLng - minLng;
+
+  // Avoid division by zero
+  if (latRange === 0 || lngRange === 0) {
+    return (
+      <svg width="100%" height="100%" viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`} className="bg-black/20">
+        <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle" fill="#555" fontSize="12">POINT_DATA_ONLY</text>
+      </svg>
+    );
+  }
 
   // Calculate scaling factors for both dimensions
   let scaleX = SVG_WIDTH / lngRange;
@@ -173,13 +192,15 @@ const MapTraceSVG = ({ latlngs, bounds }) => {
   const offsetY = (SVG_HEIGHT - (latRange * scale)) / 2;
 
 
-  // Convert lat/lng points to SVG x/y points
-  const points = latlngs.map(([lat, lng]) => {
-    // Invert Y-axis for SVG (top is 0, bottom is height)
-    const x = (lng - minLng) * scale + offsetX;
-    const y = SVG_HEIGHT - ((lat - minLat) * scale + offsetY); // Invert Y
-    return `${x},${y}`;
-  }).join(' ');
+  // Convert lat/lng points to SVG x/y points, filtering out invalid entries
+  const points = latlngs
+    .filter(point => Array.isArray(point) && point.length >= 2 && typeof point[0] === 'number' && typeof point[1] === 'number')
+    .map(([lat, lng]) => {
+      // Invert Y-axis for SVG (top is 0, bottom is height)
+      const x = (lng - minLng) * scale + offsetX;
+      const y = SVG_HEIGHT - ((lat - minLat) * scale + offsetY); // Invert Y
+      return `${x},${y}`;
+    }).join(' ');
 
   return (
     <svg width="100%" height="100%" viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`} className="bg-black/20 border border-neutral-800 rounded-sm">
