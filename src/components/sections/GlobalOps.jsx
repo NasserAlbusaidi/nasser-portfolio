@@ -64,30 +64,37 @@ export default function GlobalOps() {
     const activityList = useMemo(() => {
         if (!mapData?.features) return [];
         return mapData.features
-            .filter(f => f.properties?.name)
+            .filter(f => f.properties?.name && f.geometry?.coordinates?.length > 0)
             .slice(0, 8) // Limit to 8 activities
-            .map(f => ({
-                id: f.properties.id || f.properties.name,
-                name: f.properties.name,
-                type: f.properties.type,
-                date: f.properties.date,
-                coordinates: f.geometry?.coordinates?.[0] || [58.4, 23.6] // First coordinate point
-            }));
+            .map(f => {
+                // Get first point of the path for flyTo target
+                const firstCoord = f.geometry?.coordinates?.[0];
+                return {
+                    id: f.properties.id || f.properties.name,
+                    name: f.properties.name,
+                    type: f.properties.type,
+                    date: f.properties.date,
+                    coordinates: Array.isArray(firstCoord) ? firstCoord : [58.4, 23.6]
+                };
+            });
     }, [mapData]);
 
     // FlyTo target acquisition
     const handleActivitySelect = (activity) => {
         setSelectedActivity(activity.id);
 
-        if (mapRef.current) {
+        if (mapRef.current && activity.coordinates) {
             const coords = activity.coordinates;
-            mapRef.current.flyTo({
-                center: Array.isArray(coords[0]) ? coords : coords,
-                zoom: 13,
-                duration: 2000,
-                pitch: 45,
-                bearing: 30
-            });
+            // Ensure coords is a valid [lng, lat] pair
+            if (Array.isArray(coords) && coords.length >= 2 && typeof coords[0] === 'number') {
+                mapRef.current.flyTo({
+                    center: coords,
+                    zoom: 13,
+                    duration: 2000,
+                    pitch: 45,
+                    bearing: 30
+                });
+            }
         }
 
     };
