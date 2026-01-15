@@ -27,3 +27,4 @@ service-account.json
 
 .gemini/
 gha-creds-*.json
+.env
